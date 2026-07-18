@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://claude-reference.local/schema/note-frontmatter.schema.json",
+  "title": "Literature note frontmatter",
+  "description": "笔记 YAML frontmatter 的字段规范, 供任意脚本(DeepSeek API 生成后)做程序化校验. 与 AGENTS.md 中的说明保持一致, 如有冲突以 AGENTS.md 文字描述为准.",
+  "type": "object",
+  "required": ["citekey", "title", "authors", "authors_full", "year", "journal", "doi", "tags", "类型", "方法关键词", "体系", "status", "added"],
+  "properties": {
+    "citekey": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[A-Za-z0-9]+-[A-Za-z0-9-]+$",
+      "description": "格式(2026-07-17改版): 年份-期刊简称-提炼标题(元素符号/OER/TEM等缩写按规范大小写书写, 见AGENTS.md citekey规则)"
+    },
+    "title": { "type": "string", "minLength": 1 },
+    "authors": { "type": "string", "minLength": 1, "description": "简短显示形式, 如 \"第一作者 et al.\"" },
+    "authors_full": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "description": "完整作者名单(按原文顺序), 供按作者检索; bib条目的author字段也用这个(BibTeX惯例列全部作者)"
+    },
+    "year": { "type": "integer", "minimum": 1900, "maximum": 2100 },
+    "journal": { "type": "string", "minLength": 1 },
+    "doi": { "type": "string", "minLength": 1 },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "description": "受控词表大类, 优先从 AGENTS.md 词表选"
+    },
+    "keywords": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "自由细粒度关键词, 精读时建议 5~10 个; 粗建档可为空数组. 写前参考 KEYWORDS.md 复用已有词, 避免近义词"
+    },
+    "类型": {
+      "type": "string",
+      "enum": ["计算", "实验", "计算+实验", "综述"]
+    },
+    "方法关键词": { "type": "string", "minLength": 1 },
+    "表征方法": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "标准化表征技术列表, 供检索用。纯缩写(DEMS/XPS/TEM/XRD等)直接大写; in situ/operando/ex situ 前缀+技术名之间用空格, 不用连字符或粘连(写 'in situ Raman' 不写 'insitu-Raman'); 文中含糊就只列能确定的, 不编造; 纯计算论文可为空数组"
+    },
+    "体系": { "type": "string", "minLength": 1 },
+    "status": {
+      "type": "string",
+      "enum": ["unread", "skimmed", "read"]
+    },
+    "rating": {
+      "type": "string",
+      "pattern": "^★{1,5}$"
+    },
+    "related": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[0-9]{4}-[A-Za-z0-9]+-[A-Za-z0-9-]+$"
+      }
+    },
+    "si_files": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[0-9]{4}-[A-Za-z0-9]+-[A-Za-z0-9-]+_SI\\.(pdf|docx|doc)$"
+      },
+      "description": "papers/ 下对应的 SI(补充材料) 文件名, 命名须为 <citekey>_SI.<ext>; 无 SI 则为空数组"
+    },
+    "added": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+    }
+  },
+  "additionalProperties": false
+}
