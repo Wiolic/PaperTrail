@@ -1,141 +1,91 @@
-# LLM-Assisted Literature Notes System
+# 对话驱动的文献精读笔记系统
 
-一个用 LLM 驱动的**文献精读笔记库框架**：PDF 入库、结构化笔记生成、标签/关键词检索、主题综述、逐句添加引文、Word 里直接插入引用、去重体检、扩充查新新文献，全部脚本化、可断点续跑。
+一套**跟 AI 对话就能用**的个人文献知识库框架：把论文 PDF 变成结构化精读笔记，然后用大白话指挥 AI 帮你检索、去重体检、写论文时逐句找引文、在 Word 里插引用、发现领域新文献、生成主题综述——全部脚本化、可断点续跑，还带一个本地网页操作面板。
 
-> **📖 零编程基础？直接看 [QUICKSTART.md](QUICKSTART.md)** —— 从装 Agent CLI、注册 API Key 到跑完第一次入库，一步步照着做，30~60 分钟能用起来。**如果你已经有 Claude Code、Codex CLI 或 Kimi Code，上手门槛几乎为零**：把这个仓库丢给它、说一声"帮我照着 QUICKSTART.md 把这套系统装起来"，剩下的事它会自己做，你不需要会写代码、不需要懂 git，只要会打字聊天。
+> ## 🚀 只想赶紧用起来？→ 直接看 **[QUICKSTART.md](QUICKSTART.md)**
+>
+> 核心流程只有三步：**装一个 AI 助手 → 下载本仓库 → 粘贴一段开场白让 AI 帮你配好环境**。之后你就用"入库""体检""帮我找这句话能引哪些文献"这样的大白话跟它对话。**不用会写代码、不用懂命令行。** QUICKSTART 里给了可以直接复制的开场白和每一步的具体做法。
 
-**不锁定单一 Agent CLI**：`AGENTS.md`（数据格式与内容生产规范）是任何支持项目级指令文件的 Agent CLI 都能读的通用格式，Claude Code / Codex CLI / Kimi Code 都能直接用；`CLAUDE.md`（架构维护者角色说明）Claude Code 会自动加载，Codex/Kimi Code 用户第一次对话时明说一句"也读一下 CLAUDE.md"即可获得同样的能力，具体差别见 QUICKSTART.md。**用 Codex CLI 的看 [prompts/codex-cli-guide.md](prompts/codex-cli-guide.md)**——配置模型 provider、日常指令示例、审批/沙箱注意事项都写在里面。**Claude Code/Codex CLI 使用受限（没有海外支付方式、访问不稳定）的，可以用国内的 Kimi Code 代替**，用法完全一致。
+---
 
-**不锁定 DeepSeek**：核心调用逻辑在 `scripts/ds.py` 里用的是标准 OpenAI SDK 接口，换成 `base_url` 就能接 Kimi、通义千问、GLM、OpenAI、本地 vLLM/Ollama 等任何 OpenAI 兼容的 API——项目默认配 DeepSeek 只是因为它便宜，不是架构上绑死了它。
+## 这套系统的核心理念：两个 AI 分工
 
-不是一个"上传论文自动总结"的一次性小工具，而是一套**长期维护型个人文献知识库**的工作流规范 —— 灵感类似 Zotero/Obsidian，但笔记生产主要由 LLM 完成、人工负责审核和架构一致性维护。
+- **Agent CLI（总管）** —— Claude Code / Codex CLI / Kimi Code 任一个。跟你对话、读你本地文件、做需要判断的活：查重、核实 DOI、配对补充材料、归纳综述。
+- **大模型 API（工人）** —— DeepSeek（默认，最便宜）或任何 OpenAI 兼容服务。被总管调用，便宜地跑批量体力活：读 PDF、抽元数据、起草笔记。
 
-> 本仓库只包含**系统骨架**（脚本 + 规范文档 + 模板），不含实际的论文 PDF、笔记内容或文献元数据 —— 这些是使用者自己的文献库数据，请另建私有仓库或本地目录存放，本框架负责生产和维护它们。
+你几乎从不直接碰命令行——你对总管说人话，总管决定要不要调工人、要不要跑哪个脚本。**这不是"上传论文自动总结"的一次性小工具，而是一套长期维护型个人文献库的工作流规范**（灵感类似 Zotero/Obsidian，但笔记生产主要由 AI 完成、人负责审核和一致性维护）。
 
-## ⭐ 重点功能
+**不锁定任何一家**：Agent CLI 三选一都行；模型 API 改 `scripts/ds.py` 一行 `base_url` 就能从 DeepSeek 换成 Kimi/通义/GLM/OpenAI/本地 Ollama。
 
-### 1. 写论文时逐句添加引文
+> 本仓库只包含**系统骨架**（脚本 + 规范文档 + 模板），不含任何论文 PDF、笔记内容或文献元数据——那些是你自己的库数据，另存本地/私有仓库。
 
-写论文最烦的一步不是"找不到文献"，而是"关键词能搜到一堆论文，但哪几篇的结论方向真的和我这句话一致"——同一种现象（比如某个表征信号随电位的变化）在不同体系里经常被不同论文报告成相反的结论，单纯关键词命中会把方向相反的文献也拉进引用列表。
+---
 
-把你正在写的一整段论文正文丢给它，直接说"引文献"：
+## ⭐ 能帮你做什么
 
-```bash
-python scripts/find_citations.py --paragraph "你的一整段英文/中文正文" \
-  --out topics/_citations.md --draft
-```
+### 1. 写论文时逐句（甚至逐词）找引文，还分辨方向
 
-它会自动把整段拆成一句句独立论点，逐句去库里（必要时联网）找候选文献，再判断每一篇是 **support**（方向一致可以引）/ **contradict**（数据或结论矛盾，会说明矛盾在哪个分句）/ **unclear**（信息不足），跳过作者自己的论点表述（不需要外部引用的部分）不占位凑数。**输出是按原文顺序逐句对照的清单**，读起来就是：
+写论文最烦的不是"找不到文献"，而是"关键词能搜到一堆，但哪几篇的结论真的跟我这句话一致"——同一个现象在不同体系里常被报告成相反结论，纯关键词命中会把方向相反的文献也塞进引用列表。
 
-```
-原文第1句：The Ir L3-edge XANES white line shifts to higher energy with increasing potential...
-- **citekey1** — 《论文标题》(期刊, 年份) [support]: 理由...
-- **citekey2** — 《论文标题》(期刊, 年份) [contradict]: 理由...
+把你正在写的一整段丢给 AI、说"引文献"，它会：
+- 自动把整段拆成一个个需要引用的点，
+- **枚举句逐项拆分**：像 "...strategies including alloying, morphological engineering, valence-state modulation..." 这种一句列举多种手段、每项各挂一个引用编号的句子，会拆成每一项单独找引文，并告诉你**引用编号该插在哪个词后面**，
+- 对每篇候选判断 **support**（方向一致可引）/ **contradict**（矛盾，说明矛盾在哪个分句）/ **unclear**（信息不足），
+- 跳过作者自己的论点表述（不需要外部引用的部分），不占位凑数。
 
-原文第2句：This is our proposed novel mechanism...
-（无需引用——这是作者自己的论点表述）
+输出是按原文顺序逐处对照的清单，你核对一遍就能定引用，省掉"逐句想关键词、逐篇读摘要判断方向"的体力活。
 
-原文第3句：...
-- **citekey3** — 《论文标题》(期刊, 年份) [support]: 理由...
-```
-
-判断结果仍需要你自己核对一遍再定引用，不是拿来直接照抄发表的，但省掉了"逐句想关键词、逐篇读摘要判断方向"的体力活。
-
-### 2. 不装 EndNote/Zotero，直接在 Word 里插入/自动添加引用
+### 2. 不装 EndNote/Zotero，直接在 Word 里插引用
 
 核对完想要的引用后，三条路都能走：
+- **导出 RIS/BibTeX**（`export_for_endnote.py`）供 EndNote/Zotero 一次性批量导入；
+- **直接在打开着的 Word 文档光标处插入**编号引用 + 自动维护文末 References（`word_insert_citation.py`，支持 `numbered`/`nature`/`wiley`/`gbt7714` 多种格式、`--rebuild` 重新连续编号，仅 Windows）；
+- **更懒**：`word_auto_cite.py` 对整篇 Word 扫一遍，自动识别待引用句、检索候选、把 support 的引用插到对应句子后（默认预览，确认再 `--apply`）。
 
-① 导出成 EndNote/Zotero 能直接批量导入的 RIS/BibTeX 文件（`export_for_endnote.py`），不用再去文献管理软件里逐篇手动搜索。
+覆盖"日常写作、单一编号格式、支持增删重排"的核心需求，但不是 EndNote 的完全替代（不是 Word 域代码，不能一键切换样式全文重排），投特殊样式期刊前请人工再核对。
 
-② `word_insert_citation.py` 直接连到你已经打开着的 Word 文档，在光标停的地方插入编号标记，文档末尾自动维护一份 References 列表，效果类似 EndNote 的 Cite While You Write（仅 Windows）：
+### 3. "扩充"/"查新"：自动发现领域新文献
 
-```bash
-python scripts/word_insert_citation.py --citekeys 2024-Science-Foo-Bar --style nature
-```
+搜某方向近几年顶刊全量文献（扩充）或只搜库上次扫描以来的新增（查新），自动跟库里去重、按你的分类词表粗分类，产出精简待下载清单。有 DOI 的走 Crossref 核验，只有标题的走 Crossref 标题反查——**都不靠 LLM 猜 DOI**（猜错比没有更糟）。
 
-支持 `numbered`（默认，`[n]` 括号）/`nature`（上标编号）/`wiley`（仿 Angewandte）/`gbt7714`（仿中国国标数字顺序制）几种参考文献格式（近似风格，卷期页码本库未存储，投稿前需自行核对补齐）；删了/挪动了引用后跑 `--rebuild` 能重新按正文顺序连续编号、自动清理不再被引用的条目——**日常写作单一编号格式、支持增删重排**，这个场景是覆盖的。
+### 4. 本地网页操作面板
 
-③ **更懒的做法**：`word_auto_cite.py --doc <文件名> --apply` 直接对着整篇已打开的 Word 文档扫一遍，自动识别哪些句子像是需要引用支撑、检索候选、判断方向，把判断为 support 的引用自动插到对应句子后面并维护 References——不用你自己一句句挑。默认是预览模式（先看它打算插哪些，确认没问题再加 `--apply`），毕竟是批量自动改你的真实稿子，不能默认就执行。
+不想全程打字，就让 AI"打开操作面板"（Windows 也可以直接双击 `PaperTrail Launcher.bat`）。一个本地网页仪表盘：浏览/搜索/筛选/排序全部文献、读笔记、拖 PDF 进 inbox、跑体检/引文献/扩充查新。**"入库"仍走对话**（查重/核实需要判断，表单干不了）。
 
-这几个工具能覆盖"日常写作、单一编号格式、支持增删重排"的核心需求，但**不是** EndNote/Zotero 的完全替代——它们不是 Word 域代码，做不到"一键切换成另一种引用样式、全文自动重排"，也没有独立的文献库管理/PDF 阅读器这些配套功能。真要投一个要求特殊样式的期刊，投稿前建议再人工核对一遍格式细节。
-
-### 3. "扩充"/"查新"：自动发现该领域最新/遗漏的顶刊文献
-
-搜某个方向近几年 top journals 全量文献（"扩充"）或只搜库上次扫描以来的新增（"查新"），自动跟库里已有的去重、按你定义的分类词表粗分类，产出一份精简的待下载清单——把"读一堆搜索结果人工挑候选、逐篇查 DOI 核对"这几步都交给脚本：
-
-```bash
-python scripts/parse_search_results.py --raw-file raw_search_dump.txt --context "搜索目标" --out candidates.json
-python scripts/scan_new_papers.py --candidates candidates.json --out exports/new_papers.xlsx
-```
-
-有 DOI 的候选走 Crossref 直接核验，只有标题的候选走 Crossref 标题反查——**都不靠 LLM 猜 DOI**（猜错比没有更糟），确定性 HTTP 查询更可靠。
-
-## 这套系统解决什么问题
-
-管文献不难，难的是随着库变大之后：
-- 笔记格式各篇不一致，没法批量检索/统计
-- 同一篇论文因为来源不同被重复收录，人工很难发现
-- 补充材料（SI）和主文献散落、配对关系丢失
-- 想做"某个主题的综述"，得把几十篇笔记翻出来手动整理
-- 从 PDF 提炼结构化信息（元数据、方法学、数值型实验数据）纯人工做太慢，全自动做又容易出错/编造
-
-这套框架用「LLM 负责体力活（抽取、起草），人/高阶 Agent 负责判断（查重、核实、综述归纳）」的分工，加上一套统一的 Markdown + YAML frontmatter + BibTeX 格式，把这些问题变成可以脚本化检测和修复的东西。
+---
 
 ## 核心设计
 
-- **`notes/` 是唯一真源**：每篇笔记是 `<citekey>.md`，YAML frontmatter（结构化元数据）+ Markdown 正文（七节式摘要），citekey 格式 `<年份>-<期刊简称>-<提炼标题>`。
-- **`notes-readable/` 是只读派生版**：正文按 60 字符折行给人阅读，脚本自动从 `notes/` 同步生成，永远不手改。
-- **五处一致性**：`papers/<citekey>.pdf`、`notes/<citekey>.md`、`notes-readable/<citekey>.md`、`library.bib` 条目、`INDEX.md` 行，citekey 必须逐字一致 —— `check_library.sh` 自动核对。
-- **查重不止查 DOI**：DOI 缺失/提取错误时用标题相似度兜底查重（这是踩过坑之后加的，见 `AGENTS.md` 里的具体案例）。
-- **添加引文分方向判断，不是关键词命中就算**：`find_citations.py` 对每篇候选给 support/contradict/unclear 判断而不是笼统"相关"，见上方"重点功能"。
-- **可复用的维护脚本**：合并重复收录、批量改期刊缩写、导出主题文件夹、生成主题综述 docx，都是参数化脚本，不是一次性代码。
-- **API 不锁定单一供应商**：`scripts/ds.py` 走标准 OpenAI SDK 接口，换 `base_url`/`model` 即可接任何 OpenAI 兼容的 LLM 服务。
+- **`notes/` 是唯一真源**：每篇是 `<citekey>.md`，YAML frontmatter（结构化元数据）+ Markdown 正文（七节式摘要），citekey 格式 `<年份>-<期刊简称>-<提炼标题>`。
+- **`notes-readable/` 是只读派生版**：正文按 60 字符折行给人读，脚本自动从 `notes/` 同步生成，永不手改。
+- **五处一致性**：`papers/<citekey>.pdf`、`notes/<citekey>.md`、`notes-readable/<citekey>.md`、`library.bib` 条目、`INDEX.md` 行，citekey 逐字一致，`check_library.sh` 自动核对。
+- **查重不止查 DOI**：DOI 缺失/错误时用标题相似度兜底（踩过坑之后加的）。
+- **引文分方向判断**：`find_citations.py` 给每篇候选 support/contradict/unclear，不是笼统"相关"。
+- **API 不锁定单一供应商**：`scripts/ds.py` 走标准 OpenAI 接口，换 `base_url`/`model` 即可。
 
-完整规范见 [`AGENTS.md`](AGENTS.md)（数据格式与内容生产流程，任何 LLM/API 照做）和 [`CLAUDE.md`](CLAUDE.md)（给 Claude Code 之类 Agent CLI 的架构维护者角色说明）。
+完整规范见 [`AGENTS.md`](AGENTS.md)（数据格式与内容生产流程，唯一权威）和 [`CLAUDE.md`](CLAUDE.md)（AI 作为"架构维护者"的角色说明）。
 
-## 快速开始
-
-```bash
-git clone <this-repo> my-literature-library
-cd my-literature-library
-
-# 建自己的数据目录(不随仓库分发)
-mkdir -p inbox papers notes notes-readable extracted-text topics exports data
-
-pip install -r requirements.txt
-export DEEPSEEK_API_KEY="sk-..."   # 换用其他 OpenAI 兼容 API(Kimi/通义/GLM/OpenAI/本地模型等)
-                                    # 只需要改 scripts/ds.py 里的 base_url 和读取的环境变量名
-```
-
-然后：
-1. 把待整理的 PDF 丢进 `inbox/`
-2. 用你的 Agent CLI（Claude Code / Codex / Kimi Code / 其他）读取 `AGENTS.md` 作为项目指令，让它按"入库任务的标准步骤"处理，或直接跑 `python scripts/batch_ingest.py --source inbox --limit 15` 做无人值守批量入库
-3. 定期跑 `bash scripts/check_library.sh` 体检
-
-## 克隆后必须做的事（去掉领域特定内容）
-
-本仓库的 `AGENTS.md`/`templates/note-template.md` 里标了 **`[领域定制]`** 的部分（原型是电催化/材料科学文献库）是示例内容，换成你自己领域的：
-- frontmatter 里的领域专属结构化字段（原例：`类型`/`方法关键词`/`表征方法`/`体系`）
-- 标签词表（`AGENTS.md` 末尾的标签词表一节）
-- `scripts/top_journals.txt` 里的"顶刊"名单
-- `scripts/extract_performance.py`、`scripts/ds.py` 里 SYSTEM_PROMPT 提到的领域术语（如果你要用结构化数值抽取功能）
-- `scripts/scan_new_papers.py` 里 `classify_category()` 的分类关键词（如果你要用"扩充/查新"功能）
-
-其余部分（citekey 规则、SI 绑定、查重、体检、综述工作流）是领域无关的，不需要改。
+---
 
 ## 目录结构
 
 ```
-AGENTS.md            数据格式与内容生产规范(给 LLM 读)
-CLAUDE.md             架构维护者角色说明(给 Agent CLI 读)
-QUICKSTART.md         零编程基础的新手指南
-templates/            笔记模板 + frontmatter schema
-schema/               JSON Schema, 供程序化校验
-scripts/              全部工具脚本(见下)
-prompts/              可复制的操作提示词
-requirements.txt
-LICENSE
+QUICKSTART.md         ★ 新手从这里开始（对话式上手）
+README.md             本文件（总览）
+AGENTS.md             数据格式与内容生产规范（唯一权威，给 AI 读）
+CLAUDE.md             架构维护者角色说明（给 Agent CLI 读）
+PaperTrail Launcher.bat       双击打开网页操作面板（Windows）
+templates/            笔记模板
+schema/               frontmatter JSON Schema，供程序化校验
+scripts/              全部工具脚本（见下）
+prompts/              Codex CLI 等的操作指南
+requirements.txt      Python 依赖
+LICENSE               MIT
 ```
+
+克隆后你自己的数据目录（`inbox/ papers/ notes/ notes-readable/ extracted-text/ topics/ exports/ data/` 及 `library.bib`/`INDEX.md`/`KEYWORDS.md`）由 QUICKSTART Step 4 里的 AI 帮你创建，不随仓库分发（已在 `.gitignore` 排除）。
+
+---
 
 ## 脚本一览
 
@@ -143,52 +93,51 @@ LICENSE
 |---|---|
 | `check_library.sh` | 体检：papers/notes/bib 三方对账 + 全库标题查重 + SI 绑定核对 |
 | `build_keyword_index.sh` | 重建关键词索引 |
-| `batch_ingest.py` | 无人值守批量入库(断点续跑) |
-| `ds.py` | 通用 LLM API 调用(chat / json / pdf-meta) |
-| `ingest_from_meta.py` | 把 `ds.py pdf-meta` 的 JSON 直接组装成六处文件，省去人工重打正文 |
-| `render_readable_notes.py` | `notes/` → `notes-readable/` 全量重新同步 |
-| `regenerate_notes.py` | 用已缓存的全文重新调用 LLM 重写笔记正文，断点续跑 |
-| `match_orphan_si.py` | 跨文件夹配不上的 SI 附件用标题相似度匹配 |
-| `extract_performance.py` | 批量抽取结构化数值数据到 csv([领域定制]示例) |
-| `build_topic_digest.py` | 主题综述第一步：按标签/关键词筛笔记 + 自动查重，可选起草分类初稿 |
-| `find_citations.py` | 给一句/一段话逐句添加可引用的文献，区分 support/contradict/unclear |
-| `export_for_endnote.py` | 导出指定 citekey 列表为 RIS/BibTeX，供文献管理软件批量导入 |
-| `word_insert_citation.py` | 直接在已打开的 Word 文档光标处插入编号引用+自动维护 References 小节，支持多种格式和 `--rebuild` 重新编号（仅 Windows） |
-| `word_auto_cite.py` | 自动扫描已打开的 Word 文档全文，识别待引用位置并一键插入建议引用（仅 Windows，默认预览模式） |
-| `scan_new_papers.py` | 候选论文 Crossref 核验 + 去重 + 分类，导出待下载 xlsx |
-| `scan_state.py` | 记录每个领域上次扫描到哪天，供"只搜增量"用 |
-| `parse_search_results.py` | 把搜索引擎原始结果交给便宜的 LLM 抽取候选论文列表 |
-| `md_to_docx.py` | Markdown 综述转 docx(python-docx 实现) |
-| `find_duplicate_titles.py` | 全库标题相似度查重(独立于体检也可单跑) |
-| `resolve_duplicate.py` | 合并两个确认重复的 citekey，自动处理五处文件 |
+| `batch_ingest.py` | 无人值守批量入库（断点续跑） |
+| `ds.py` | 通用 LLM API 调用（chat / json / pdf-meta） |
+| `ingest_from_meta.py` | 把 `ds.py pdf-meta` 的 JSON 直接组装成六处文件 |
+| `render_readable_notes.py` | `notes/` → `notes-readable/` 全量同步 |
+| `regenerate_notes.py` | 用缓存全文重新调 LLM 重写笔记正文，断点续跑 |
+| `match_orphan_si.py` | 用标题相似度给孤立 SI 附件配对已入库文献 |
+| `extract_performance.py` | 批量抽取结构化数值到 csv（[领域定制] 示例） |
+| `build_topic_digest.py` | 主题综述第一步：筛笔记 + 查重，可选起草分类初稿 |
+| `find_citations.py` | 给一句/一段话逐处找可引文献，分 support/contradict/unclear |
+| `export_for_endnote.py` | 导出指定 citekey 为 RIS/BibTeX 供批量导入 |
+| `word_insert_citation.py` | 在打开的 Word 光标处插编号引用+维护 References（仅 Windows） |
+| `word_auto_cite.py` | 自动扫描 Word 全文识别待引用位置并一键插入（仅 Windows，默认预览） |
+| `scan_new_papers.py` | 候选论文 Crossref 核验 + 去重 + 分类，导出 xlsx |
+| `scan_state.py` | 记录每个领域上次扫描到哪天，供"只搜增量" |
+| `parse_search_results.py` | 把搜索原始结果交给便宜 LLM 抽取候选列表 |
+| `md_to_docx.py` | Markdown 综述转 docx（python-docx） |
+| `find_duplicate_titles.py` | 全库标题相似度查重 |
+| `resolve_duplicate.py` | 合并两个确认重复的 citekey，处理五处文件 |
 | `rename_journal_abbr.py` | 批量改写 citekey 里的期刊简称 |
 | `export_referable_folder.py` | 按条件筛选，导出 PDF+笔记到独立文件夹 |
+| `ui/app.py` | 本地网页操作面板（Streamlit） |
 
-每个脚本都有 `--help` 和文件头 docstring 说明用法；涉及删除/改名的脚本默认预览模式，加 `--apply` 才真正执行。
+每个脚本都有 `--help` 和文件头 docstring；涉及删除/改名的默认预览模式，加 `--apply` 才执行。**但日常你不用记这些——对 AI 说人话即可。**
 
-零编程基础、想直接照着操作的，看 [QUICKSTART.md](QUICKSTART.md)。
+---
 
 ## 💰 处理一篇论文大概花多少钱
 
-批量入库（`ds.py pdf-meta` / `batch_ingest.py`）用的是便宜的模型档位（如 DeepSeek 的 `deepseek-v4-flash` 这一档），单篇成本可以按下面的方式自己估算：
+批量入库用的是便宜的模型档位，单篇成本可按下面估算：
 
 | 环节 | token 量级 | 说明 |
 |---|---|---|
-| 输入（论文全文） | 常规论文（15~40 页）约 8,000~20,000 tokens，脚本设了 200,000 字符（约 5 万 token）的兜底上限防超长 PDF | 全文一次性传入，不是只读摘要 |
-| 输出（结构化元数据 + 七节精读笔记） | 约 1,500~3,000 tokens | JSON 格式，字段固定，不是自由发挥的长文 |
+| 输入（论文全文） | 常规论文约 8,000~20,000 tokens（脚本设 20 万字符兜底上限防超长 PDF） | 全文一次性传入 |
+| 输出（结构化元数据 + 七节笔记） | 约 1,500~3,000 tokens | JSON 格式，字段固定 |
 
-按"便宜档"模型（DeepSeek 这类国产模型每百万 token 输入几毛钱、输出一元出头的量级，具体以你用的 API 商当前定价页为准）估算，**单篇论文的入库成本大概是几分钱人民币、甚至更低的量级**。
-
-**实测参考**：入库 **400 篇论文**，调用 DeepSeek 的总花费大约 **10 元人民币**——平均下来单篇不到 3 分钱。
-
-想要更精确的数字，用这个公式自己套：
+按 DeepSeek 这类国产模型的定价，**单篇入库成本大概几分钱人民币**。**实测：入库 400 篇约花 10 元**，平均单篇不到 3 分钱。
 
 ```
-单篇成本 ≈ (输入token数 / 1,000,000) × 输入单价 + (输出token数 / 1,000,000) × 输出单价
+单篇成本 ≈ (输入token / 1e6) × 输入单价 + (输出token / 1e6) × 输出单价
 ```
 
-把 `scripts/ds.py` 换成你自己的 API/模型时，把这两个单价换成你实际用的定价页数字即可。像"引文献"逐句添加引文、"扩充/查新"候选抽取这类功能，单次调用的 token 量级比整篇入库还小（只处理摘要片段或搜索结果文字），成本可以忽略不计。
+换成你自己的 API 时，把两个单价换成你实际定价页的数字即可。引文献、扩充查新这类功能单次 token 量比整篇入库还小，成本可忽略。
+
+---
 
 ## License
 
-MIT，见 [LICENSE](LICENSE)。你自己文献库里的论文 PDF 本身仍受各自出版商版权约束，不受本仓库许可证覆盖 —— 不要把 PDF 原文/全文提取内容放进公开仓库。
+MIT，见 [LICENSE](LICENSE)。你库里的论文 PDF 本身仍受各自出版商版权约束，不受本仓库许可证覆盖——**不要把 PDF 原文/全文提取内容放进公开仓库。**

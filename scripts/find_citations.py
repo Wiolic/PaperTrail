@@ -71,15 +71,28 @@ DRAFT_SYSTEM = (
 )
 
 SEGMENT_SYSTEM = (
-    "你在协助分析一段论文正文, 判断这段话里有哪些独立的论点/陈述需要引用文献支撑, 哪些不需要"
+    "你在协助分析一段论文正文, 判断这段话里有哪些地方需要引用文献支撑, 哪些不需要"
     "(比如作者自己论文的核心创新点表述、纯逻辑推导、无需引用的过渡句)。只输出一个 JSON 对象:\n"
-    '{"claims": [{"text": "该论点的原文片段(尽量原样摘录, 可以是完整句子或子句)", '
+    '{"claims": [{'
+    '"text": "该引用点对应的原文片段(尽量原样摘录, 可以是完整句子或子句)", '
+    '"anchor_phrase": "这条引用在句中具体挂在哪个词/短语上(正式论文里引用编号会紧跟在它后面), '
+    "整句性论点若没有更细的锚点, 就填该句主干或留成和 text 一致\", "
     '"needs_citation": true/false, '
     '"reason_if_not": "如果 needs_citation 为 false, 一句话说明为什么(如\'这是作者自己的创新点表述\')", '
     '"keyword_regex": "如果 needs_citation 为 true, 给一个用于在文献库里检索相关论文的正则表达式"'
-    "(英文关键词为主, 用 | 分隔同义/相关词, 覆盖该论点涉及的核心概念/技术/材料)}]}\n"
-    "拆分粒度: 一段话通常能拆出 2~5 条需要引用的独立论点, 不要过度拆分(把同一个意思的两个分句"
-    "拆成两条), 也不要遗漏(一段话里明显有好几个不同的事实性论断却只拆出一条)。"
+    "(英文关键词为主, 用 | 分隔同义/相关词, 覆盖该引用点涉及的核心概念/技术/材料)}]}\n"
+    "拆分粒度: 一段话通常能拆出 2~5 条需要引用的独立论点, 不要把同一个意思的两个分句拆成两条, "
+    "也不要遗漏明显不同的事实性论断。\n"
+    "**枚举句要逐项拆分(重要)**: 如果一句话用 'including A, B, C...' 或逐项列举多种手段/策略/现象/"
+    "材料, 而每一项在正式论文里都会各自挂一个引用编号, 那么每一项都必须拆成一条独立 claim, "
+    "anchor_phrase 填该项的短语, keyword_regex 针对该项单独检索——绝不能把整个枚举句只拆成一条"
+    "笼统的 claim, 那样会漏掉每一项各自需要的引用。\n"
+    "示例: 输入 'Extensive efforts have been devoted to improving Ir-based catalysts through strategies "
+    "including alloying, morphological engineering, valence-state modulation, defect and heteroatom doping, "
+    "core-shell architecture design, and single-atom catalysis.' 应拆成 6 条 claim, "
+    "anchor_phrase 分别为 alloying / morphological engineering / valence-state modulation / "
+    "defect and heteroatom doping / core-shell architecture design / single-atom catalysis, "
+    "每条 keyword_regex 针对该策略(如 alloying 那条: 'Ir.*alloy|iridium alloy|bimetallic')。"
 )
 
 
@@ -197,12 +210,18 @@ def main():
     # 核心交付物(2026-07-20 加): 按原文顺序逐句对照"原文这句 -> 可以引用哪些文献",
     # 而不是先分组再分别罗列——这样读者可以直接顺着原文读下来, 每句话后面跟着能不能引、
     # 引哪几篇, 不需要自己再去对照分散在各节里的论点编号。
-    summary_lines = [f"# 逐句引文对照 (共 {len(claims)} 句, {n_need} 句需要引用, {n_skip} 句跳过)", ""]
+    summary_lines = [f"# 逐处引文对照 (共 {len(claims)} 处引用点, {n_need} 处需要引用, {n_skip} 处跳过)",
+                     "", "> 枚举句已按每一项拆成独立引用点, 各项的引用编号应插在其\"引用锚点\"短语之后。", ""]
     detail_lines = ["", "---", "", "## 附：各论点候选文献检索详情(检索关键词/完整候选列表)", ""]
 
     for i, c in enumerate(claims, 1):
         text = c["text"]
-        summary_lines.append(f"**原文第{i}句**：{text}")
+        anchor = (c.get("anchor_phrase") or "").strip()
+        summary_lines.append(f"**原文第{i}处**：{text}")
+        # 枚举句会被拆成多条, 各挂在句中不同短语上; 把锚点显式标出来, 人工插引用时
+        # 才知道这个引用编号该放在哪个词后面(如 "alloying" 后面), 不是整句句尾。
+        if anchor and anchor != text:
+            summary_lines.append(f"（引用锚点：**{anchor}** ← 引用编号插在这个词/短语之后）")
         if not c.get("needs_citation", True):
             summary_lines.append(f"（无需引用——{c.get('reason_if_not', '作者自己的论点/推导')}）")
             summary_lines.append("")
@@ -217,14 +236,14 @@ def main():
             summary_lines.append("（未加 --draft，只筛出候选未判断方向，见文末详情）")
         summary_lines.append("")
 
-        detail_lines.append(f"### 第{i}句候选检索详情：「{text}」")
+        detail_lines.append(f"### 第{i}处候选检索详情：「{text}」")
         detail_lines.append(f"(检索关键词: `{c['keyword_regex']}`)")
         detail_lines.append("")
         detail_lines.append(digest_text)
         detail_lines.append("")
 
     out_path.write_text("\n".join(summary_lines + detail_lines), encoding="utf-8")
-    print(f"已写入 {out_path}（{n_need} 句需要引用, {n_skip} 句跳过）—— "
+    print(f"已写入 {out_path}（{n_need} 处需要引用, {n_skip} 处跳过）—— "
           f"仍需人工核对每条判断, 不要直接照抄引用列表")
 
 

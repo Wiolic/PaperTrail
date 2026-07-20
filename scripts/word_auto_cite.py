@@ -102,31 +102,36 @@ def main():
     to_process = [c for c in claims if c.get("needs_citation", True)]
     print(f"拆出 {len(claims)} 条论点, {len(to_process)} 条需要引用, 逐条检索候选并判断...")
 
-    plan = []  # [(sentence, citekey, verdict, insert_range_or_None)]
+    # 枚举句被 segment_paragraph 拆成多条, 每条挂在句中不同短语(anchor_phrase)上。定位插入
+    # 位置时优先用 anchor_phrase(如 "alloying"), 这样引用编号插在该项短语之后而不是整句句尾,
+    # 符合正式论文里逐项挂引用的写法; anchor_phrase 缺失时退回用整条 text 定位。
+    plan = []  # [(sentence, locate_target, citekey, verdict)]
     for i, c in enumerate(to_process, 1):
         sentence = c["text"]
+        anchor = (c.get("anchor_phrase") or "").strip() or sentence
         print(f"[{i}/{len(to_process)}] {sentence[:60]}...")
         selected, dupes = search_candidates(c["keyword_regex"], tags, journal_set)
         if not selected:
-            plan.append((sentence, None, "no_candidates", None))
+            plan.append((sentence, anchor, None, "no_candidates"))
             continue
         digest_text = build_digest_text(sentence, selected, dupes)
         citations_text = run_draft(ds, args.draft_model, sentence, digest_text)
         verdicts = parse_verdicts(citations_text)
         support = [ck for ck, v in verdicts if v == "support" and ck in bib_entries]
         if not support:
-            plan.append((sentence, None, "no_support", None))
+            plan.append((sentence, anchor, None, "no_support"))
             continue
-        plan.append((sentence, support[0], "support", None))
+        plan.append((sentence, anchor, support[0], "support"))
 
-    n_support = sum(1 for _, _, status, _ in plan if status == "support")
-    print(f"\n共 {len(plan)} 句处理完毕, {n_support} 句有 support 候选可插入, "
-          f"{len(plan) - n_support} 句跳过(无候选或都是 contradict/unclear)。")
+    n_support = sum(1 for _, _, _, status in plan if status == "support")
+    print(f"\n共 {len(plan)} 处处理完毕, {n_support} 处有 support 候选可插入, "
+          f"{len(plan) - n_support} 处跳过(无候选或都是 contradict/unclear)。")
 
     if not args.apply:
         print("\n--- 预览(未修改文档, 加 --apply 正式执行) ---")
-        for sentence, citekey, status, _ in plan:
-            tag = {"support": f"→ 建议插入 {citekey}", "no_support": "→ 跳过(无 support 候选)",
+        for sentence, anchor, citekey, status in plan:
+            tag = {"support": f"→ 建议插入 {citekey}（锚点: {anchor[:40]}）",
+                   "no_support": "→ 跳过(无 support 候选)",
                    "no_candidates": "→ 跳过(库里没检索到候选)"}[status]
             print(f"「{sentence[:70]}」 {tag}")
         return
@@ -138,12 +143,15 @@ def main():
     style = citemap["style"]
 
     inserted, not_found = [], []
-    for sentence, citekey, status, _ in plan:
+    for sentence, anchor, citekey, status in plan:
         if status != "support":
             continue
         ref_start = find_references_heading_start(doc)  # References 小节可能已被插入, 每次重新定位边界
         body_end = ref_start if ref_start is not None else doc.Content.End
-        rng = locate_sentence(doc, body_end, sentence)
+        # 优先在 anchor 短语后插入(枚举句每项各自挂引用); anchor 定位不到再退回整句。
+        rng = locate_sentence(doc, body_end, anchor)
+        if rng is None and anchor != sentence:
+            rng = locate_sentence(doc, body_end, sentence)
         if rng is None:
             not_found.append(sentence)
             continue

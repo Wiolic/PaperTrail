@@ -12,11 +12,33 @@
 - 若 PDF 来源于外部只读系统（EndNote 库、共享网盘等），**绝不修改、移动、删除**那里的任何文件——只能复制。
 - 本库内也不做批量删除；要清理先列清单给用户确认。
 
+## 首次使用检测：主动引导个性化（重要，每次对话开始都先判断一下）
+
+读完 `AGENTS.md`/本文件后，先判断**这是不是用户第一次用这套系统**。首次使用的信号（满足其一即可判断）：
+- `library.bib`/`notes/`/`INDEX.md` 不存在或是空的；
+- `AGENTS.md`、`templates/note-template.md` 里还留着 `[领域定制]` 占位标记没被替换成具体领域内容；
+- 用户明显刚解压/克隆完仓库、还没提过自己的研究领域。
+
+**如果判断是首次使用，不要默默照搬电催化示例模板往下干活，也不要坐等用户自己发现要改 `[领域定制]`——主动开口问清楚，再动手初始化**。用聊天的口吻问，每个问题都带一两个例子帮用户理解你在问什么（用户很可能没读过 `AGENTS.md`，不知道"tags"/"frontmatter"这些术语是什么意思），大致像这样问（可以合并成一两条消息，不用逐条等回复）：
+
+1. "你的研究方向大概是什么？比如'钙钛矿太阳能电池'、'肠道菌群与代谢'、'宏观经济政策'这种，随便说说就行，不用很精确。"
+2. "你平时最看重、最常读的期刊有哪些？说几个就行（比如 Nature/Science 大子刊，或你们领域公认的头部期刊）。"
+3. "整理文献的时候，你希望能按哪些角度分类检索？比如按研究方法、按研究对象、按你手头的几个不同课题分——随便举几个你脑子里会用来找文献的关键词/角度都行，不用想得多规范。"
+4. "除了标题、作者这些通用信息，你还希望笔记里额外记录哪些结构化字段？比如做实验的记'样品制备方法'，做社科的可能想记'研究方法(定量/定性/实验)'——不确定的话可以先说说你平时读论文最关心哪几类信息，我来帮你设计字段。"
+5. "你打算用哪个大模型 API？（默认建议 DeepSeek，最便宜；也可以用 Kimi/通义/GLM/OpenAI/本地模型）Key 配置好了吗？"
+
+**关键：用户会用自然语言随口回答（一整句话、举例子、想到哪说到哪），这些原始文本不能直接照抄塞进 `tags`/`TAG_VOCAB`/字段名这些结构化位置——你要自己提炼归纳**：把用户的大白话转换成简短、规范、无重复的受控词表条目（英文为主的名词短语或简短中文标签，不是整句话）、合理的 frontmatter 字段名和取值范围、贴切的 `top_journals.txt` 期刊全名列表。如果提炼后不确定是否准确概括了用户的意思，可以把归纳结果复述给用户确认一遍再落笔，不要把用户的原话原样当成标签写进配置文件。
+
+拿到回答并归纳好之后，一次性把这些标了 `[领域定制]` 的地方改完：`AGENTS.md`（标签词表、frontmatter 字段定义）、`templates/note-template.md`、`schema/note-frontmatter.schema.json`、`scripts/batch_ingest.py`（`TAG_VOCAB`/`USER_RESEARCH_CONTEXT`/领域字段的 prompt 描述）、`scripts/top_journals.txt`、`scripts/scan_new_papers.py`（如果用户会用"扩充/查新"功能，也要改分类关键词）。改完列一份清单告诉用户改了哪些，不要让用户后续自己一项项发现遗漏。
+
+如果 `notes/` 里已经有实际数据、`AGENTS.md` 的措辞已经是某个具体领域——说明不是首次使用，跳过这步，直接按已有规范干活。
+
 ## 目录结构
 
 ```
 AGENTS.md      ★ 数据格式与内容生产规范(唯一真源,给 DeepSeek/任意 API 读)
 CLAUDE.md      本文件:架构维护者(我)的角色说明
+PaperTrail Launcher.bat  双击打开 scripts/ui/app.py 网页操作面板(需先 pip install streamlit)
 INDEX.md       总索引表
 library.bib    主 BibTeX 库
 inbox/         入口:新 PDF 待整理
@@ -31,6 +53,7 @@ templates/     note-template.md (与 AGENTS.md 字段定义保持同步)
 KEYWORDS.md    关键词索引(脚本自动生成,勿手编)
 schema/        note-frontmatter.schema.json (供程序化校验 frontmatter)
 scripts/       见下方"脚本一览"
+scripts/ui/    app.py: 本地网页操作面板(Streamlit), `streamlit run scripts/ui/app.py` 启动
 prompts/       操作指南与可复制提示词
 ```
 
@@ -59,6 +82,7 @@ prompts/       操作指南与可复制提示词
 - **导出给 EndNote/文献管理软件**：`export_for_endnote.py --citekeys <逗号分隔citekey> --out exports/<文件名>.ris` 导出一份只含推荐引用的 RIS/BibTeX 文件供一次性批量导入，替代逐篇手动搜索。
 - **不装 EndNote/Zotero，直接在 Word 光标处插入引用**：`word_insert_citation.py --citekeys <逗号分隔citekey> [--doc <文件名片段>]`（仅 Windows+已装Word，需 `pip install pywin32`）。通过 Word 的 COM 接口连到**已经打开着**的文档（不会自己开 Word/开文件），在当前光标处插入编号标记，同时在文档末尾维护 "References" 小节列出编号对应的文献；同一 citekey 重复插入会复用原编号。前提：目标文档必须已在 Word 里打开、光标停在目标位置。支持 `--style {numbered,nature,wiley,gbt7714}` 换参考文献格式（近似风格，不是严格实现官方规范，library.bib 没存卷期页码，投稿前要自己核对补齐）；改了/删了引用位置后跑 `--rebuild` 重新按正文出现顺序连续编号+重建 References（只支持 `[n]` 括号样式，`nature` 的上标编号没法可靠重新定位）。局限：不是 Word 域代码，不能像 EndNote 那样一键切换引用样式重排全文；不会自动保存，需要自己 Ctrl+S。
 - **一键扫描全文识别待引用位置并自动插入**：`word_auto_cite.py --doc <文件名片段> [--apply]`——把上面这个脚本和"引文献"（`find_citations.py`）串起来，自动读已打开文档的正文全文、拆成若干条论点（跳过作者自陈的部分）、逐条检索候选并判断 support/contradict/unclear，对 support 候选精确定位到文档里那句话并自动插入引用+维护 References。**默认只预览不改文档**，确认没问题再加 `--apply`。局限：定位靠精确字符串匹配，LLM 摘录文字和文档实际文字有细微出入会定位失败并跳过（会在输出里列出来提示手动补插）；每句只自动插第一条 support 候选。
+- **"打开操作面板"/网页界面（2026-07-20新增，标题叫 PaperTrail）**：跑 `streamlit run scripts/ui/app.py`（需要 `pip install streamlit`）在本机开一个网页操作面板，把总览/文献库/体检/引文献/扩充查新/Word插入引用/命令七个功能包一层表单，不用记命令行参数；跟随 Streamlit 默认主题，喜欢别的配色自己加一份 `scripts/ui/.streamlit/config.toml`。Windows 用户装完依赖后可以直接双击库根目录下的 `PaperTrail Launcher.bat` 打开面板，不用敲命令。总览页可以拖拽 PDF 直接放进 `inbox/`；点"📥 入库"会先检测本机有没有 Agent CLI（Claude Code/Codex/Kimi）进程在跑——**检测到就弹提示建议回那边对话做"入库"**（查重/DOI核实/SI配对这些判断更可靠），需要用户点"仍要在网页直接全自动入库"二次确认才会跑 `batch_ingest.py` 纯 API 自动入库；**没检测到 Agent CLI 在跑，才直接自动执行**。**文献库页**可以浏览全部笔记、按标题/关键词搜索、按标签/期刊筛选、只看 Top Journals、按添加时间/年份/期刊排序、分页浏览(每页50篇)；卡片是紧凑布局(信息在左、"笔记"/"PDF"两个按钮在右侧窄栏，不是竖向堆叠)，展示完整标题+期刊+年份+标签(小方框)+关键词，点"笔记"在**页面右侧独立窗格**打开笔记全文(含期刊/年份/作者/可点击DOI链接/类型/方法关键词/表征方法/体系等字段)并支持就地编辑标签和正文各小节；左右两栏各自独立滚动，打开笔记时右侧从头展示不受左侧滚动位置影响；点"PDF"用系统默认阅读器打开；"命令"页可以直接敲命令跑，或者用自然语言描述需求让 LLM 翻译成命令，**翻译结果先展示确认、手动点运行才执行**，不会自动跑；"引文献"页跑起来时有实时进度条和"停止"按钮。**不包含"入库"**——入库涉及的查重/DOI核实/SI配对判断本来就要靠对话完成，网页表单做不了这部分，仍旧回到 Agent CLI 对话里处理。⚠️ Windows 上跑体检功能时注意：`bash` 命令有时会被系统 PATH 优先解析到 WSL 的 bash.exe 而不是 Git Bash（两者不兼容会报环境错误），面板代码里已经显式探测 Git Bash 安装路径规避这个坑。
 - **"扩充"/"查新"**（搜某领域近N年 top journals 全量文献 / 只搜库上次扫描以来的新文章）：① 先跑 `scan_state.py show --field "<领域名>"` 看上次扫到哪天；② 用 WebSearch/浏览器按"期刊+关键词"多角度检索，同一领域按子类分别搜（不要只锚定单一关键词，容易漏掉措辞不同但相关的论文）；③ 把原始搜索结果存文件，跑 `parse_search_results.py --raw-file <文件> --context "<搜索目标>" --out candidates.json`，用便宜的 LLM 从噪声文字里抽出候选论文列表；④ 跑 `scan_new_papers.py --candidates candidates.json --out exports/<文件名>.xlsx`，对有 DOI 的候选查 Crossref 核验，对只有标题的候选做 Crossref 标题反查（不用 LLM 猜 DOI），核对完按 DOI/标题相似度去重、自动粗分类，同时输出 `.summary.txt`（只列需要下载的新条目，我读这个汇报即可，不用打开完整 xlsx）；⑤ 跑 `scan_state.py record --field "<领域名>" --date <今天> ...` 记录本次扫描供下次查新用。
 
 ## 脚本一览（`scripts/`）
@@ -77,6 +101,7 @@ prompts/       操作指南与可复制提示词
 - `export_for_endnote.py`：把指定 citekey 列表导出成 RIS/BibTeX 供文献管理软件批量导入
 - `word_insert_citation.py`：不装 EndNote/Zotero，直接在已打开的 Word 文档光标处插入编号引用+自动维护 References 小节，支持多种参考文献格式和重新编号（仅 Windows）
 - `word_auto_cite.py`：自动扫描已打开的 Word 文档全文，识别需要引用的句子并一键插入建议的引用（仅 Windows，默认预览模式）
+- `ui/app.py`：本地网页操作面板（Streamlit），包总览/文献库/体检/引文献/扩充查新/Word插入引用/命令七个功能
 - `scan_new_papers.py`：候选论文的 Crossref 核验/去重/分类，导出待下载 xlsx + 精简 summary
 - `scan_state.py`：记录每个领域上次扫描到哪天，供"查新"只搜增量
 - `parse_search_results.py`：把 WebSearch 原始结果交给便宜的 LLM 抽取候选论文列表，供 `scan_new_papers.py` 用
