@@ -38,7 +38,7 @@ PLACEHOLDER_MARKERS = ("<!-- 计算:", "")  # 空字符串命中"该小节内容
 
 
 def parse_frontmatter_field(text: str, field: str) -> str:
-    m = re.search(rf"^{re.escape(field)}:\s*(.*)$", text, re.MULTILINE)
+    m = re.search(rf"^{re.escape(field)}:[ \t]*(.*)$", text, re.MULTILINE)  # [ \t]* 不用 \s*, 避免吃掉换行符跨行误匹配
     return m.group(1).strip() if m else ""
 
 
@@ -102,6 +102,12 @@ def main():
     ap.add_argument("--title-regex", default="", help="标题字段的正则筛选(忽略大小写)")
     ap.add_argument("--keyword-regex", default="", help="在 title/体系/keywords 中匹配的正则(忽略大小写)")
     ap.add_argument("--out", required=True, help="输出摘要 Markdown 文件路径")
+    ap.add_argument("--draft", action="store_true",
+                     help="2026-07-19 加: 摘要写完后, 再调 DeepSeek(默认 v4-pro)基于摘要起草一版"
+                          "分类/对比/趋势总结初稿, 写到 <out同名>.draft.md。这是初稿, 不是成品——"
+                          "Claude 仍要通读核对(citekey出处对不对/有没有编造/分类是否合理)、补观点分歧"
+                          "和数据缺口小节再定稿成 topics/<主题>.md, 但比从摘要从零手写省不少 token")
+    ap.add_argument("--draft-model", default="deepseek-v4-pro")
     args = ap.parse_args()
 
     tags = [t.strip() for t in args.tags.split(",") if t.strip()]
@@ -157,8 +163,29 @@ def main():
 
     out_path = Path(args.out)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text("\n".join(lines), encoding="utf-8")
+    digest_text = "\n".join(lines)
+    out_path.write_text(digest_text, encoding="utf-8")
     print(f"已写入 {out_path} ({len(selected)} 篇, {len(empty_notes)} 篇正文为空, {len(dupes)} 组疑似重复)")
+
+    if args.draft:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import ds  # noqa: E402
+
+        system = (
+            "你在协助起草一份文献主题综述初稿(中文)。给定一批论文的结构化摘要(citekey/标题/年份/期刊/"
+            "体系/方法要点/关键图表与数据), 请: 1) 按方法/思路给这些论文归出3~6个大类, 每类起个简短名字; "
+            "2) 每类写一段思路小结 + 用要点列出代表性论文(每条必须用 [[citekey]] 标注出处, citekey 必须"
+            "原样照抄摘要里给的, 不要编造或改写citekey); 3) 写一节'方法-性能关联的整体趋势'总结跨类别的"
+            "共性/演变趋势; 4) 用 Markdown 输出, 标题层级用 ##/###。"
+            "严禁编造摘要之外的内容——每个结论都要能在给定摘要里找到依据, 摘要信息不够就如实说'资料不足', "
+            "不要为了行文流畅编数据或结论。这是初稿, 后面人工会核对, 但初稿本身不能有编造。"
+        )
+        print(f"正在用 {args.draft_model} 起草初稿...")
+        client = ds.get_client()
+        draft = ds.call(client, args.draft_model, system, digest_text, temperature=0, json_mode=False)
+        draft_path = out_path.with_suffix(out_path.suffix + ".draft.md")
+        draft_path.write_text(draft, encoding="utf-8")
+        print(f"已写入初稿 {draft_path} —— 仍需人工核对 citekey 出处/补观点分歧和数据缺口小节后再定稿")
 
 
 if __name__ == "__main__":

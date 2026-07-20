@@ -57,6 +57,8 @@ prompts/       操作指南与可复制提示词
 - **主题综述**：① `build_topic_digest.py --tags <标签> --keyword-regex <正则> --out <路径> [--draft]` 筛候选笔记+自动查重，可选让 LLM 顺带起草分类初稿；② 核对 `[[citekey]]` 引用真实存在、补写需要判断的小节，定稿成 `topics/<主题>.md`；③ `md_to_docx.py` 转 docx 交付物。
 - **"引文献"**：给一句/一段要写进论文的话逐句添加可引用的文献，不是简单关键词命中就算——`find_citations.py --claim "<陈述句>" --keyword-regex "<正则>" --out <路径> --draft` 单句模式，或 `--paragraph "<整段正文>"` 让脚本先自动拆分成多条论点再逐条判断 support/contradict/unclear，最终引用决定权在人。**输出格式是按原文顺序逐句对照的清单**（"原文第1句：...→引文列表；原文第2句：...→无需引用；..."），不是先分组再罗列——这样可以直接顺着原文读下来核对，不用自己对照分散的论点编号。
 - **导出给 EndNote/文献管理软件**：`export_for_endnote.py --citekeys <逗号分隔citekey> --out exports/<文件名>.ris` 导出一份只含推荐引用的 RIS/BibTeX 文件供一次性批量导入，替代逐篇手动搜索。
+- **不装 EndNote/Zotero，直接在 Word 光标处插入引用**：`word_insert_citation.py --citekeys <逗号分隔citekey> [--doc <文件名片段>]`（仅 Windows+已装Word，需 `pip install pywin32`）。通过 Word 的 COM 接口连到**已经打开着**的文档（不会自己开 Word/开文件），在当前光标处插入编号标记，同时在文档末尾维护 "References" 小节列出编号对应的文献；同一 citekey 重复插入会复用原编号。前提：目标文档必须已在 Word 里打开、光标停在目标位置。支持 `--style {numbered,nature,wiley,gbt7714}` 换参考文献格式（近似风格，不是严格实现官方规范，library.bib 没存卷期页码，投稿前要自己核对补齐）；改了/删了引用位置后跑 `--rebuild` 重新按正文出现顺序连续编号+重建 References（只支持 `[n]` 括号样式，`nature` 的上标编号没法可靠重新定位）。局限：不是 Word 域代码，不能像 EndNote 那样一键切换引用样式重排全文；不会自动保存，需要自己 Ctrl+S。
+- **一键扫描全文识别待引用位置并自动插入**：`word_auto_cite.py --doc <文件名片段> [--apply]`——把上面这个脚本和"引文献"（`find_citations.py`）串起来，自动读已打开文档的正文全文、拆成若干条论点（跳过作者自陈的部分）、逐条检索候选并判断 support/contradict/unclear，对 support 候选精确定位到文档里那句话并自动插入引用+维护 References。**默认只预览不改文档**，确认没问题再加 `--apply`。局限：定位靠精确字符串匹配，LLM 摘录文字和文档实际文字有细微出入会定位失败并跳过（会在输出里列出来提示手动补插）；每句只自动插第一条 support 候选。
 - **"扩充"/"查新"**（搜某领域近N年 top journals 全量文献 / 只搜库上次扫描以来的新文章）：① 先跑 `scan_state.py show --field "<领域名>"` 看上次扫到哪天；② 用 WebSearch/浏览器按"期刊+关键词"多角度检索，同一领域按子类分别搜（不要只锚定单一关键词，容易漏掉措辞不同但相关的论文）；③ 把原始搜索结果存文件，跑 `parse_search_results.py --raw-file <文件> --context "<搜索目标>" --out candidates.json`，用便宜的 LLM 从噪声文字里抽出候选论文列表；④ 跑 `scan_new_papers.py --candidates candidates.json --out exports/<文件名>.xlsx`，对有 DOI 的候选查 Crossref 核验，对只有标题的候选做 Crossref 标题反查（不用 LLM 猜 DOI），核对完按 DOI/标题相似度去重、自动粗分类，同时输出 `.summary.txt`（只列需要下载的新条目，我读这个汇报即可，不用打开完整 xlsx）；⑤ 跑 `scan_state.py record --field "<领域名>" --date <今天> ...` 记录本次扫描供下次查新用。
 
 ## 脚本一览（`scripts/`）
@@ -73,6 +75,8 @@ prompts/       操作指南与可复制提示词
 - `build_topic_digest.py`：主题综述第一步，按 tags/关键词筛笔记 + 抽方法要点摘录 + 自动标题查重，`--draft` 可选起草分类初稿
 - `find_citations.py`：给陈述句/整段正文逐句添加可引用的文献，判断 support/contradict/unclear
 - `export_for_endnote.py`：把指定 citekey 列表导出成 RIS/BibTeX 供文献管理软件批量导入
+- `word_insert_citation.py`：不装 EndNote/Zotero，直接在已打开的 Word 文档光标处插入编号引用+自动维护 References 小节，支持多种参考文献格式和重新编号（仅 Windows）
+- `word_auto_cite.py`：自动扫描已打开的 Word 文档全文，识别需要引用的句子并一键插入建议的引用（仅 Windows，默认预览模式）
 - `scan_new_papers.py`：候选论文的 Crossref 核验/去重/分类，导出待下载 xlsx + 精简 summary
 - `scan_state.py`：记录每个领域上次扫描到哪天，供"查新"只搜增量
 - `parse_search_results.py`：把 WebSearch 原始结果交给便宜的 LLM 抽取候选论文列表，供 `scan_new_papers.py` 用

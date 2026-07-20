@@ -35,7 +35,7 @@ def load_top_journals() -> set:
 
 
 def parse_field(text: str, field: str) -> str:
-    m = re.search(rf"^{re.escape(field)}:\s*(.*)$", text, re.MULTILINE)
+    m = re.search(rf"^{re.escape(field)}:[ \t]*(.*)$", text, re.MULTILINE)  # [ \t]* 不用 \s*, 避免吃掉换行符跨行误匹配
     return m.group(1).strip() if m else ""
 
 

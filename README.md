@@ -1,10 +1,10 @@
 # LLM-Assisted Literature Notes System
 
-一个用 LLM 驱动的**文献精读笔记库框架**：PDF 入库、结构化笔记生成、标签/关键词检索、主题综述、逐句添加引文、去重体检，全部脚本化、可断点续跑。
+一个用 LLM 驱动的**文献精读笔记库框架**：PDF 入库、结构化笔记生成、标签/关键词检索、主题综述、逐句添加引文、Word 里直接插入引用、去重体检、扩充查新新文献，全部脚本化、可断点续跑。
 
-> **📖 零编程基础？直接看 [QUICKSTART.md](QUICKSTART.md)** —— 从装 Agent CLI、注册 API Key 到跑完第一次入库，一步步照着做，30~60 分钟能用起来。**如果你已经有 Claude Code 或 Codex CLI，上手门槛几乎为零**：把这个仓库丢给它、说一声"帮我照着 QUICKSTART.md 把这套系统装起来"，剩下的事它会自己做，你不需要会写代码、不需要懂 git，只要会打字聊天。
+> **📖 零编程基础？直接看 [QUICKSTART.md](QUICKSTART.md)** —— 从装 Agent CLI、注册 API Key 到跑完第一次入库，一步步照着做，30~60 分钟能用起来。**如果你已经有 Claude Code、Codex CLI 或 Kimi Code，上手门槛几乎为零**：把这个仓库丢给它、说一声"帮我照着 QUICKSTART.md 把这套系统装起来"，剩下的事它会自己做，你不需要会写代码、不需要懂 git，只要会打字聊天。
 
-**不锁定单一 Agent CLI**：`AGENTS.md`（数据格式与内容生产规范）是任何支持项目级指令文件的 Agent CLI 都能读的通用格式，Claude Code / Codex CLI 都能直接用；`CLAUDE.md`（架构维护者角色说明）Claude Code 会自动加载，Codex 用户第一次对话时明说一句"也读一下 CLAUDE.md"即可获得同样的能力，具体差别见 QUICKSTART.md。**用 Codex CLI 的看 [prompts/codex-cli-guide.md](prompts/codex-cli-guide.md)**——配置模型 provider、日常指令示例、审批/沙箱注意事项都写在里面。
+**不锁定单一 Agent CLI**：`AGENTS.md`（数据格式与内容生产规范）是任何支持项目级指令文件的 Agent CLI 都能读的通用格式，Claude Code / Codex CLI / Kimi Code 都能直接用；`CLAUDE.md`（架构维护者角色说明）Claude Code 会自动加载，Codex/Kimi Code 用户第一次对话时明说一句"也读一下 CLAUDE.md"即可获得同样的能力，具体差别见 QUICKSTART.md。**用 Codex CLI 的看 [prompts/codex-cli-guide.md](prompts/codex-cli-guide.md)**——配置模型 provider、日常指令示例、审批/沙箱注意事项都写在里面。**Claude Code/Codex CLI 使用受限（没有海外支付方式、访问不稳定）的，可以用国内的 Kimi Code 代替**，用法完全一致。
 
 **不锁定 DeepSeek**：核心调用逻辑在 `scripts/ds.py` 里用的是标准 OpenAI SDK 接口，换成 `base_url` 就能接 Kimi、通义千问、GLM、OpenAI、本地 vLLM/Ollama 等任何 OpenAI 兼容的 API——项目默认配 DeepSeek 只是因为它便宜，不是架构上绑死了它。
 
@@ -12,28 +12,9 @@
 
 > 本仓库只包含**系统骨架**（脚本 + 规范文档 + 模板），不含实际的论文 PDF、笔记内容或文献元数据 —— 这些是使用者自己的文献库数据，请另建私有仓库或本地目录存放，本框架负责生产和维护它们。
 
-## 💰 处理一篇论文大概花多少钱
+## ⭐ 重点功能
 
-批量入库（`ds.py pdf-meta` / `batch_ingest.py`）用的是便宜的模型档位（如 DeepSeek 的 `deepseek-v4-flash` 这一档），单篇成本可以按下面的方式自己估算：
-
-| 环节 | token 量级 | 说明 |
-|---|---|---|
-| 输入（论文全文） | 常规论文（15-40 页）约 8,000-20,000 tokens，脚本设了 200,000 字符（约 5 万 token）的兜底上限防超长 PDF | 全文一次性传入，不是只读摘要 |
-| 输出（结构化元数据 + 七节精读笔记） | 约 1,500-3,000 tokens | JSON 格式，字段固定，不是自由发挥的长文 |
-
-按"便宜档"模型（DeepSeek 这类国产模型每百万 token 输入几毛钱、输出一元出头的量级，具体以你用的 API 商当前定价页为准）估算，**单篇论文的入库成本大概是几分钱人民币、甚至更低的量级**。
-
-**实测参考**：入库 **400 篇论文**，调用 DeepSeek 的总花费大约 **10 元人民币**——平均下来单篇不到 3 分钱。
-
-想要更精确的数字，用这个公式自己套：
-
-```
-单篇成本 ≈ (输入token数 / 1,000,000) × 输入单价 + (输出token数 / 1,000,000) × 输出单价
-```
-
-把 `scripts/ds.py` 换成你自己的 API/模型时，把这两个单价换成你实际用的定价页数字即可。像"引文献"逐句添加引文、"扩充/查新"候选抽取这类功能，单次调用的 token 量级比整篇入库还小（只处理摘要片段或搜索结果文字），成本可以忽略不计。
-
-## ⭐ 重点功能：写论文时逐句添加引文
+### 1. 写论文时逐句添加引文
 
 写论文最烦的一步不是"找不到文献"，而是"关键词能搜到一堆论文，但哪几篇的结论方向真的和我这句话一致"——同一种现象（比如某个表征信号随电位的变化）在不同体系里经常被不同论文报告成相反的结论，单纯关键词命中会把方向相反的文献也拉进引用列表。
 
@@ -58,7 +39,36 @@ python scripts/find_citations.py --paragraph "你的一整段英文/中文正文
 - **citekey3** — 《论文标题》(期刊, 年份) [support]: 理由...
 ```
 
-判断结果仍需要你自己核对一遍再定引用，不是拿来直接照抄发表的，但省掉了"逐句想关键词、逐篇读摘要判断方向"的体力活。核对完想要的引用后，还能一步导出成 EndNote/Zotero 能直接批量导入的 RIS/BibTeX 文件（见下方脚本一览的 `export_for_endnote.py`），不用再去文献管理软件里逐篇手动搜索。
+判断结果仍需要你自己核对一遍再定引用，不是拿来直接照抄发表的，但省掉了"逐句想关键词、逐篇读摘要判断方向"的体力活。
+
+### 2. 不装 EndNote/Zotero，直接在 Word 里插入/自动添加引用
+
+核对完想要的引用后，三条路都能走：
+
+① 导出成 EndNote/Zotero 能直接批量导入的 RIS/BibTeX 文件（`export_for_endnote.py`），不用再去文献管理软件里逐篇手动搜索。
+
+② `word_insert_citation.py` 直接连到你已经打开着的 Word 文档，在光标停的地方插入编号标记，文档末尾自动维护一份 References 列表，效果类似 EndNote 的 Cite While You Write（仅 Windows）：
+
+```bash
+python scripts/word_insert_citation.py --citekeys 2024-Science-Foo-Bar --style nature
+```
+
+支持 `numbered`（默认，`[n]` 括号）/`nature`（上标编号）/`wiley`（仿 Angewandte）/`gbt7714`（仿中国国标数字顺序制）几种参考文献格式（近似风格，卷期页码本库未存储，投稿前需自行核对补齐）；删了/挪动了引用后跑 `--rebuild` 能重新按正文顺序连续编号、自动清理不再被引用的条目——**日常写作单一编号格式、支持增删重排**，这个场景是覆盖的。
+
+③ **更懒的做法**：`word_auto_cite.py --doc <文件名> --apply` 直接对着整篇已打开的 Word 文档扫一遍，自动识别哪些句子像是需要引用支撑、检索候选、判断方向，把判断为 support 的引用自动插到对应句子后面并维护 References——不用你自己一句句挑。默认是预览模式（先看它打算插哪些，确认没问题再加 `--apply`），毕竟是批量自动改你的真实稿子，不能默认就执行。
+
+这几个工具能覆盖"日常写作、单一编号格式、支持增删重排"的核心需求，但**不是** EndNote/Zotero 的完全替代——它们不是 Word 域代码，做不到"一键切换成另一种引用样式、全文自动重排"，也没有独立的文献库管理/PDF 阅读器这些配套功能。真要投一个要求特殊样式的期刊，投稿前建议再人工核对一遍格式细节。
+
+### 3. "扩充"/"查新"：自动发现该领域最新/遗漏的顶刊文献
+
+搜某个方向近几年 top journals 全量文献（"扩充"）或只搜库上次扫描以来的新增（"查新"），自动跟库里已有的去重、按你定义的分类词表粗分类，产出一份精简的待下载清单——把"读一堆搜索结果人工挑候选、逐篇查 DOI 核对"这几步都交给脚本：
+
+```bash
+python scripts/parse_search_results.py --raw-file raw_search_dump.txt --context "搜索目标" --out candidates.json
+python scripts/scan_new_papers.py --candidates candidates.json --out exports/new_papers.xlsx
+```
+
+有 DOI 的候选走 Crossref 直接核验，只有标题的候选走 Crossref 标题反查——**都不靠 LLM 猜 DOI**（猜错比没有更糟），确定性 HTTP 查询更可靠。
 
 ## 这套系统解决什么问题
 
@@ -99,7 +109,7 @@ export DEEPSEEK_API_KEY="sk-..."   # 换用其他 OpenAI 兼容 API(Kimi/通义/
 
 然后：
 1. 把待整理的 PDF 丢进 `inbox/`
-2. 用你的 Agent CLI（Claude Code / Codex / 其他）读取 `AGENTS.md` 作为项目指令，让它按"入库任务的标准步骤"处理，或直接跑 `python scripts/batch_ingest.py --source inbox --limit 15` 做无人值守批量入库
+2. 用你的 Agent CLI（Claude Code / Codex / Kimi Code / 其他）读取 `AGENTS.md` 作为项目指令，让它按"入库任务的标准步骤"处理，或直接跑 `python scripts/batch_ingest.py --source inbox --limit 15` 做无人值守批量入库
 3. 定期跑 `bash scripts/check_library.sh` 体检
 
 ## 克隆后必须做的事（去掉领域特定内容）
@@ -109,6 +119,7 @@ export DEEPSEEK_API_KEY="sk-..."   # 换用其他 OpenAI 兼容 API(Kimi/通义/
 - 标签词表（`AGENTS.md` 末尾的标签词表一节）
 - `scripts/top_journals.txt` 里的"顶刊"名单
 - `scripts/extract_performance.py`、`scripts/ds.py` 里 SYSTEM_PROMPT 提到的领域术语（如果你要用结构化数值抽取功能）
+- `scripts/scan_new_papers.py` 里 `classify_category()` 的分类关键词（如果你要用"扩充/查新"功能）
 
 其余部分（citekey 规则、SI 绑定、查重、体检、综述工作流）是领域无关的，不需要改。
 
@@ -117,6 +128,7 @@ export DEEPSEEK_API_KEY="sk-..."   # 换用其他 OpenAI 兼容 API(Kimi/通义/
 ```
 AGENTS.md            数据格式与内容生产规范(给 LLM 读)
 CLAUDE.md             架构维护者角色说明(给 Agent CLI 读)
+QUICKSTART.md         零编程基础的新手指南
 templates/            笔记模板 + frontmatter schema
 schema/               JSON Schema, 供程序化校验
 scripts/              全部工具脚本(见下)
@@ -141,6 +153,8 @@ LICENSE
 | `build_topic_digest.py` | 主题综述第一步：按标签/关键词筛笔记 + 自动查重，可选起草分类初稿 |
 | `find_citations.py` | 给一句/一段话逐句添加可引用的文献，区分 support/contradict/unclear |
 | `export_for_endnote.py` | 导出指定 citekey 列表为 RIS/BibTeX，供文献管理软件批量导入 |
+| `word_insert_citation.py` | 直接在已打开的 Word 文档光标处插入编号引用+自动维护 References 小节，支持多种格式和 `--rebuild` 重新编号（仅 Windows） |
+| `word_auto_cite.py` | 自动扫描已打开的 Word 文档全文，识别待引用位置并一键插入建议引用（仅 Windows，默认预览模式） |
 | `scan_new_papers.py` | 候选论文 Crossref 核验 + 去重 + 分类，导出待下载 xlsx |
 | `scan_state.py` | 记录每个领域上次扫描到哪天，供"只搜增量"用 |
 | `parse_search_results.py` | 把搜索引擎原始结果交给便宜的 LLM 抽取候选论文列表 |
@@ -153,6 +167,27 @@ LICENSE
 每个脚本都有 `--help` 和文件头 docstring 说明用法；涉及删除/改名的脚本默认预览模式，加 `--apply` 才真正执行。
 
 零编程基础、想直接照着操作的，看 [QUICKSTART.md](QUICKSTART.md)。
+
+## 💰 处理一篇论文大概花多少钱
+
+批量入库（`ds.py pdf-meta` / `batch_ingest.py`）用的是便宜的模型档位（如 DeepSeek 的 `deepseek-v4-flash` 这一档），单篇成本可以按下面的方式自己估算：
+
+| 环节 | token 量级 | 说明 |
+|---|---|---|
+| 输入（论文全文） | 常规论文（15~40 页）约 8,000~20,000 tokens，脚本设了 200,000 字符（约 5 万 token）的兜底上限防超长 PDF | 全文一次性传入，不是只读摘要 |
+| 输出（结构化元数据 + 七节精读笔记） | 约 1,500~3,000 tokens | JSON 格式，字段固定，不是自由发挥的长文 |
+
+按"便宜档"模型（DeepSeek 这类国产模型每百万 token 输入几毛钱、输出一元出头的量级，具体以你用的 API 商当前定价页为准）估算，**单篇论文的入库成本大概是几分钱人民币、甚至更低的量级**。
+
+**实测参考**：入库 **400 篇论文**，调用 DeepSeek 的总花费大约 **10 元人民币**——平均下来单篇不到 3 分钱。
+
+想要更精确的数字，用这个公式自己套：
+
+```
+单篇成本 ≈ (输入token数 / 1,000,000) × 输入单价 + (输出token数 / 1,000,000) × 输出单价
+```
+
+把 `scripts/ds.py` 换成你自己的 API/模型时，把这两个单价换成你实际用的定价页数字即可。像"引文献"逐句添加引文、"扩充/查新"候选抽取这类功能，单次调用的 token 量级比整篇入库还小（只处理摘要片段或搜索结果文字），成本可以忽略不计。
 
 ## License
 

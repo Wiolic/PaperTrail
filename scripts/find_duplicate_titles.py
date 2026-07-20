@@ -26,7 +26,7 @@ NOTES_DIR = Path(__file__).resolve().parent.parent / "notes"
 
 def read_title(path: Path) -> str:
     text = path.read_text(encoding="utf-8")
-    m = re.search(r"^title:\s*(.*)$", text, re.MULTILINE)
+    m = re.search(r"^title:[ \t]*(.*)$", text, re.MULTILINE)  # [ \t]* 不用 \s*, 避免吃掉换行符跨行误匹配
     return m.group(1).strip() if m else ""
 
 
