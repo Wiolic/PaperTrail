@@ -16,13 +16,20 @@
      --keyword-regex "XANES|white line|oxidation state|价态" --top-journals \\
      --out topics/_citations_x.md --draft
 
-2) 整段模式(2026-07-19 加, 不用自己先拆句子/想关键词, 一整段丢进来):
+2) 整段模式(2026-07-19 加, 2026-07-20 改进输出格式, 不用自己先拆句子/想关键词, 一整段丢进来):
    python scripts/find_citations.py --paragraph "一整段英文/中文论文正文" \\
      --out topics/_citations_paragraph.md --draft
-   先调 DeepSeek 把整段拆成若干条"需要引用支撑的独立论点"(每条自动生成建议关键词正则),
-   再对每条论点各自跑一遍单句模式的候选筛选+support/contradict/unclear判断, 结果按论点分节
-   写进同一个输出文件。哪些分句其实是作者自己的论点/创新点陈述、不需要外部引用, 也会被
-   识别出来直接跳过, 不占位凑数。
+   先调 DeepSeek 把整段拆成若干条"需要引用支撑的独立论点"(通常对应原文的一句或一个分句,
+   每条自动生成建议检索关键词正则), 再对每条论点各自跑一遍单句模式的候选筛选+
+   support/contradict/unclear判断。**核心交付物是按原文顺序逐句对照的清单**：
+     原文第1句：<原文>
+     - **citekey** — 《标题》(期刊, 年份) [support/contradict/unclear]: 理由
+     原文第2句：<原文>
+     （无需引用——这是作者自己的论点）
+     ...
+   哪些分句其实是作者自己的论点/创新点陈述、不需要外部引用, 会在这份逐句清单里直接标注
+   "无需引用"并说明原因, 不会被悄悄跳过、也不占位凑数。每条论点的候选检索详情(关键词/完整
+   候选列表)放在输出文件末尾单独一节, 不影响开头逐句清单的阅读连贯性。
 
 做什么(单句模式核心逻辑, 整段模式内部逐条复用):
   1. 按 --keyword-regex(必填) 和可选的 --tags / --top-journals 筛出候选笔记。
@@ -184,32 +191,40 @@ def main():
     if not claims:
         sys.exit("没拆出任何论点, 检查输入段落是否为空")
 
-    report_lines = [f"# 整段引文分析 (共拆出 {len(claims)} 条论点)", "", "## 原文", args.paragraph, ""]
-    skipped = [c for c in claims if not c.get("needs_citation", True)]
-    to_process = [c for c in claims if c.get("needs_citation", True)]
+    n_need = sum(1 for c in claims if c.get("needs_citation", True))
+    n_skip = len(claims) - n_need
 
-    if skipped:
-        report_lines.append(f"## 不需要引用的 {len(skipped)} 条(作者自己的论点/推导, 已跳过)")
-        for c in skipped:
-            report_lines.append(f"- 「{c['text']}」—— {c.get('reason_if_not', '')}")
-        report_lines.append("")
+    # 核心交付物(2026-07-20 加): 按原文顺序逐句对照"原文这句 -> 可以引用哪些文献",
+    # 而不是先分组再分别罗列——这样读者可以直接顺着原文读下来, 每句话后面跟着能不能引、
+    # 引哪几篇, 不需要自己再去对照分散在各节里的论点编号。
+    summary_lines = [f"# 逐句引文对照 (共 {len(claims)} 句, {n_need} 句需要引用, {n_skip} 句跳过)", ""]
+    detail_lines = ["", "---", "", "## 附：各论点候选文献检索详情(检索关键词/完整候选列表)", ""]
 
-    for i, c in enumerate(to_process, 1):
-        print(f"[{i}/{len(to_process)}] 处理论点: {c['text'][:50]}...")
+    for i, c in enumerate(claims, 1):
+        text = c["text"]
+        summary_lines.append(f"**原文第{i}句**：{text}")
+        if not c.get("needs_citation", True):
+            summary_lines.append(f"（无需引用——{c.get('reason_if_not', '作者自己的论点/推导')}）")
+            summary_lines.append("")
+            continue
+        print(f"[{i}/{len(claims)}] 处理: {text[:50]}...")
         digest_text, citations_text = process_one_claim(
-            c["text"], c["keyword_regex"], tags, journal_set, args.draft, args.draft_model, ds_module=ds,
+            text, c["keyword_regex"], tags, journal_set, args.draft, args.draft_model, ds_module=ds,
         )
-        report_lines.append(f"## 论点 {i}: 「{c['text']}」")
-        report_lines.append(f"(检索关键词: `{c['keyword_regex']}`)")
-        report_lines.append("")
         if citations_text:
-            report_lines.append(citations_text)
+            summary_lines.append(citations_text.strip())
         else:
-            report_lines.append(digest_text)
-        report_lines.append("")
+            summary_lines.append("（未加 --draft，只筛出候选未判断方向，见文末详情）")
+        summary_lines.append("")
 
-    out_path.write_text("\n".join(report_lines), encoding="utf-8")
-    print(f"已写入 {out_path}（{len(to_process)} 条需要引用的论点, {len(skipped)} 条跳过）—— "
+        detail_lines.append(f"### 第{i}句候选检索详情：「{text}」")
+        detail_lines.append(f"(检索关键词: `{c['keyword_regex']}`)")
+        detail_lines.append("")
+        detail_lines.append(digest_text)
+        detail_lines.append("")
+
+    out_path.write_text("\n".join(summary_lines + detail_lines), encoding="utf-8")
+    print(f"已写入 {out_path}（{n_need} 句需要引用, {n_skip} 句跳过）—— "
           f"仍需人工核对每条判断, 不要直接照抄引用列表")
 
 
