@@ -9,8 +9,9 @@ DeepSeek 的输出无人监督地直接写进 papers/notes/bib。
 子命令:
   chat       任意 system+user prompt, 返回纯文本
   json       同上, 但用 JSON 模式, 返回结构化 JSON 文本
-  pdf-meta   项目专用: 给一个 PDF 路径, 抽首页文字 + 调 DeepSeek 抽元数据(复用
-             batch_ingest.py 里已测试过的 EXTRACT_SYSTEM_PROMPT/字段定义), 返回 JSON
+  pdf-meta   项目专用: 给一个 PDF 路径, 抽全文文字(2026-07-19 起默认全文, 不再只抽前几页) +
+             调 DeepSeek 抽元数据(复用 batch_ingest.py 里已测试过的 EXTRACT_SYSTEM_PROMPT/
+             字段定义), 返回 JSON
 
 用法:
   python scripts/ds.py chat --system "..." --user "..." [--model deepseek-v4-flash]
@@ -120,7 +121,8 @@ def main():
     p.add_argument("pdf")
     p.add_argument("--model", default=DEFAULT_MODEL)
     p.add_argument("--reasoning-effort", dest="reasoning_effort", default="low")
-    p.add_argument("--max-chars", dest="max_chars", type=int, default=6000)
+    p.add_argument("--max-chars", dest="max_chars", type=int, default=200_000)  # 2026-07-19: 原默认6000只够读几页,
+    # 是"质疑与局限"/"值得追的参考文献"长期只能写占位话的根因(讨论/参考文献列表在文档靠后位置根本没读到)
     p.add_argument("--out", default=None)
     p.set_defaults(func=cmd_pdf_meta)
 

@@ -48,16 +48,34 @@ prompts/       操作指南与可复制提示词
    - 若用户只是要"读某篇文献写详细笔记"这种需要深度理解、判断、和已有笔记关联的任务，自己读 PDF 做，不外包给 LLM（LLM 适合做批量的、格式化的抽取，不适合替代精读判断）。
    - **原则：只要是"可以明确定义输入输出格式、不需要跨笔记判断"的活（元数据抽取、摘要起草、关键词建议、结构化数值抽取），都优先派给 LLM API 处理，节省人力和高阶模型的调用成本；需要跨笔记比对、查重判断、可靠性核实（如 DOI 核对）这类需要"记住上下文+做判断"的活，自己做。**
 
+## 常用工作流（指令名可以自己改，思路照搬即可）
+
+- **"入库"**：把 `inbox/` 里的 PDF 按 `AGENTS.md`"入库任务的标准步骤"处理——`ds.py pdf-meta` 抽取元数据/正文 + 我审核查重/DOI/SI 配对 + 写入 papers/library.bib/notes/notes-readable/extracted-text/INDEX.md，成功入库和确认重复的都直接删除 `inbox/` 里的源文件，只有存疑未配对的留着。
+  - **接续能力**：`ds.py pdf-meta` 的输出建议缓存到 `inbox/.meta_cache/<PDF文件名>.json` 而不是只存在会话临时目录——这样中途中断重连后，已经花 LLM 调用抽取过的文件不用重新抽取，直接复用缓存 JSON 进入审核+`ingest_from_meta.py` 落盘这一步。一篇成功落盘后连同源 PDF 一起删除对应缓存；跳过/存疑的缓存也保留着等下次一起处理。
+  - 日常单篇/小批量交互式入库用 `ds.py pdf-meta` + `ingest_from_meta.py`（省去手动重打七节正文），无人值守大批量用 `batch_ingest.py`。
+- **"体检"**：跑 `bash scripts/check_library.sh`（三方对账 + 全库标题查重）+ `bash scripts/build_keyword_index.sh`（重建 `KEYWORDS.md`）。
+- **主题综述**：① `build_topic_digest.py --tags <标签> --keyword-regex <正则> --out <路径> [--draft]` 筛候选笔记+自动查重，可选让 LLM 顺带起草分类初稿；② 核对 `[[citekey]]` 引用真实存在、补写需要判断的小节，定稿成 `topics/<主题>.md`；③ `md_to_docx.py` 转 docx 交付物。
+- **"引文献"**：核实一句/一段要写进论文的话能引用库里哪些文献，不是简单关键词命中就算——`find_citations.py --claim "<陈述句>" --keyword-regex "<正则>" --out <路径> --draft` 单句模式，或 `--paragraph "<整段正文>"` 让脚本先自动拆分成多条论点再逐条判断 support/contradict/unclear，最终引用决定权在人。
+- **导出给 EndNote/文献管理软件**：`export_for_endnote.py --citekeys <逗号分隔citekey> --out exports/<文件名>.ris` 导出一份只含推荐引用的 RIS/BibTeX 文件供一次性批量导入，替代逐篇手动搜索。
+- **"扩充"/"查新"**（搜某领域近N年 top journals 全量文献 / 只搜库上次扫描以来的新文章）：① 先跑 `scan_state.py show --field "<领域名>"` 看上次扫到哪天；② 用 WebSearch/浏览器按"期刊+关键词"多角度检索，同一领域按子类分别搜（不要只锚定单一关键词，容易漏掉措辞不同但相关的论文）；③ 把原始搜索结果存文件，跑 `parse_search_results.py --raw-file <文件> --context "<搜索目标>" --out candidates.json`，用便宜的 LLM 从噪声文字里抽出候选论文列表；④ 跑 `scan_new_papers.py --candidates candidates.json --out exports/<文件名>.xlsx`，对有 DOI 的候选查 Crossref 核验，对只有标题的候选做 Crossref 标题反查（不用 LLM 猜 DOI），核对完按 DOI/标题相似度去重、自动粗分类，同时输出 `.summary.txt`（只列需要下载的新条目，我读这个汇报即可，不用打开完整 xlsx）；⑤ 跑 `scan_state.py record --field "<领域名>" --date <今天> ...` 记录本次扫描供下次查新用。
+
 ## 脚本一览（`scripts/`）
 
 - `check_library.sh`（Git Bash）：三方对账 + notes-readable 同步检查 + 全库标题查重
 - `build_keyword_index.sh`（Git Bash）：重建 `KEYWORDS.md`
 - `batch_ingest.py`：无人值守批量入库，写 notes/ 同时生成 notes-readable/
-- `render_readable_notes.py`：从 notes/ 全量重新同步 notes-readable/
-- `match_orphan_si.py`：跨文件夹配不上的 SI 用标题相似度匹配已入库文献
 - `ds.py`：通用 LLM API 调用工具（chat/json/pdf-meta 三个子命令）
-- `extract_performance.py`：批量抽取结构化数值数据到 `data/*.csv`
-- `build_topic_digest.py`：主题综述第一步，按 tags/关键词筛笔记 + 抽方法要点摘录 + 自动标题查重
+- `ingest_from_meta.py`：把 `ds.py pdf-meta` 产出的 JSON 直接组装成 papers/notes/notes-readable/extracted-text/bib/INDEX 六处，省去人工重打七节正文
+- `render_readable_notes.py`：从 notes/ 全量重新同步 notes-readable/
+- `regenerate_notes.py`：用 extracted-text 全文重新调用 LLM 重写笔记正文/关键词，断点续跑
+- `match_orphan_si.py`：跨文件夹配不上的 SI 用标题相似度匹配已入库文献
+- `extract_performance.py`：批量抽取结构化数值数据到 `data/*.csv`（[领域定制] 见文件内 SYSTEM_PROMPT）
+- `build_topic_digest.py`：主题综述第一步，按 tags/关键词筛笔记 + 抽方法要点摘录 + 自动标题查重，`--draft` 可选起草分类初稿
+- `find_citations.py`：核实陈述句/整段正文能引用库里哪些文献，判断 support/contradict/unclear
+- `export_for_endnote.py`：把指定 citekey 列表导出成 RIS/BibTeX 供文献管理软件批量导入
+- `scan_new_papers.py`：候选论文的 Crossref 核验/去重/分类，导出待下载 xlsx + 精简 summary
+- `scan_state.py`：记录每个领域上次扫描到哪天，供"查新"只搜增量
+- `parse_search_results.py`：把 WebSearch 原始结果交给便宜的 LLM 抽取候选论文列表，供 `scan_new_papers.py` 用
 - `md_to_docx.py`：把 `topics/` 综述 Markdown 转 docx（python-docx 实现，无需 pandoc/node/LibreOffice）
 - `find_duplicate_titles.py`：全库标题相似度查重，接入 `check_library.sh`
 - `resolve_duplicate.py`：合并两个确认重复的 citekey（较优字段合并进 winner + 删 loser 五处文件），预览模式默认不落盘，加 `--apply` 执行

@@ -45,8 +45,9 @@ TEMPLATE = ROOT / "templates" / "note-template.md"
 READABLE_WIDTH = 60
 STATE = Path(__file__).resolve().parent / ".ingest_state.json"
 
+# [领域定制] 下面是电催化文献库的标签词表示例, 换成你自己领域常用的标签
 TAG_VOCAB = ["OER", "HER", "PEMWE", "AEMFC", "PEM界面", "膜降解", "IrOx", "CoOx", "RuOx",
-             "IrCoOx", "溶出", "烧结", "DFT", "AIMD", "NEB", "STEM", "cryoEM",
+             "溶出", "烧结", "DFT", "AIMD", "NEB", "STEM", "cryoEM",
              "原位表征", "EELS", "综述", "方法学",
              # 库范围不限于电催化, 补充通用大类; 都配不上就按论文实际学科新增, 不要硬套
              "电池", "2D材料", "钙钛矿", "结构生物学", "高分子", "单原子催化",
@@ -62,8 +63,9 @@ SI_MARKERS = {"si", "esi", "esm", "sup", "supp", "suppmat", "supporting", "suppl
 SI_EXTS = {".docx", ".doc"}
 CANDIDATE_EXTS = {".pdf", ".docx", ".doc"}
 
-EXTRACT_SYSTEM_PROMPT = f"""你在协助把一篇论文的正文摘录(摘要+引言+方法+结论等, 非全文)整理进文献库,
-既要抽元数据, 也要写精读笔记正文。只输出一个 JSON 对象, 不要任何解释文字、不要 markdown 代码块围栏。
+EXTRACT_SYSTEM_PROMPT = f"""你在协助把一篇论文的全文(默认传入全文, 含讨论/结论/参考文献列表;
+若确实只拿到部分文本, 缺的部分如实说明, 不要假装读了全文)整理进文献库, 既要抽元数据, 也要写精读笔记正文。
+只输出一个 JSON 对象, 不要任何解释文字、不要 markdown 代码块围栏。
 
 背景(用于判断"与我课题的关联"一项): {USER_RESEARCH_CONTEXT}
 
@@ -278,7 +280,7 @@ def lookup_metadata_via_crossref(title: str, timeout: float = 10.0) -> dict | No
         "rows": 5,
     })
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": "Claude_reference literature tool (mailto:wioliche@gmail.com)"})
+        req = urllib.request.Request(url, headers={"User-Agent": "literature-tool/1.0 (mailto:example@example.com)"})
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             data = json.loads(resp.read().decode("utf-8"))
         items = data.get("message", {}).get("items", [])
@@ -372,12 +374,17 @@ def existing_citekeys() -> set:
     return keys
 
 
-def extract_pdf_text(pdf_path: Path, max_pages: int = 8, max_chars: int = 20000) -> str:
-    """抽前 max_pages 页文字(通常覆盖摘要/引言/方法/部分结果), 供精读笔记生成用。
-    不是全文(参考文献列表、附录等更靠后的内容读不到), 提示词里已要求缺信息如实说明。"""
+def extract_pdf_text(pdf_path: Path, max_pages: int | None = None, max_chars: int = 200_000) -> str:
+    """抽全文文字(默认全文, 不只抽前几页)。
+    踩过的坑: 早期版本默认只抽前8页/20000字符, 导致依赖讨论章节和参考文献列表的字段("质疑与局限"/
+    "值得追的参考文献"等)系统性地只能写占位话——不是 LLM 偷懒, 是给它的输入本来就没有全文最后
+    部分的内容。max_chars=200000(约5万token)是防御极端超长PDF(如附带大量SI页码或扫描噪声)的
+    兜底上限, 常规论文(15~40页)的全文远用不到这个上限。max_pages 保留参数位置供需要时限制
+    (如只想要前N页), 默认 None 表示不限页数。"""
     doc = fitz.open(pdf_path)
     text = ""
-    for i in range(min(max_pages, doc.page_count)):
+    page_limit = doc.page_count if max_pages is None else min(max_pages, doc.page_count)
+    for i in range(page_limit):
         text += doc[i].get_text()
         if len(text) >= max_chars:
             break

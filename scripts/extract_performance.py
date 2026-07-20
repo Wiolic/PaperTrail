@@ -45,6 +45,8 @@ FIELDS = [
 # 不能靠"看起来像"猜——DeepSeek 抽取时如果论文没写清楚, 宁可留空也不要瞎猜。
 # 2026-07-18 起: "device" 并入 "MEA"(同一回事的两种叫法, 之前分开写导致同类数据被割裂成两种
 # test_type, 统计/筛选时要多写一次 OR 条件——历史数据已用 resolve_duplicate 同款脚本合并, 见 AGENTS.md)。
+# [领域定制] 下面这份 SYSTEM_PROMPT 和上面的 FIELDS/test_type 词表是电催化领域的完整示例,
+# 换成你自己领域"每行=一组测试条件"的结构化数值抽取需求即可(字段定义+受控词表的思路可以照搬)。
 SYSTEM_PROMPT = """你是电催化/材料领域文献数据抽取助手。给定一篇论文的正文(可能不含全文,只有前几页),
 找出论文中报告的所有"带完整测试条件的性能数据组"(通常是 OER/HER/ORR/PEMWE/AEMWE/PEMFC 等电催化性能
 指标), 每一组独立测试条件(比如半电池 vs 全电池/MEA、不同电解液、不同温度)算一行, 不要把不同条件下的
@@ -101,6 +103,22 @@ def ensure_csv():
             csv.DictWriter(f, fieldnames=FIELDS).writeheader()
 
 
+def remove_rows_for(citekeys: set):
+    """--force 重跑前先删掉这些 citekey 已有的旧行(否则 append_rows 会造成重复行)。"""
+    if not PERF_CSV.exists() or not citekeys:
+        return
+    with PERF_CSV.open("r", encoding="utf-8", newline="", errors="replace") as f:
+        # errors="replace": 2026-07-19 踩过坑, 早期某次写入夹带过非法字节导致文件不是纯UTF-8,
+        # 读的时候整个脚本会直接崩溃。宁可把个别坏字节读成 U+FFFD 继续跑, 也不要让一个历史坏字节
+        # 卡死整条流水线。
+        rows = list(csv.DictReader(f))
+    kept = [r for r in rows if r.get("citekey") not in citekeys]
+    with PERF_CSV.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=FIELDS)
+        writer.writeheader()
+        writer.writerows(kept)
+
+
 def append_rows(rows: list[dict]):
     with PERF_CSV.open("a", encoding="utf-8", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=FIELDS)
@@ -113,6 +131,10 @@ def main():
     ap.add_argument("--limit", type=int, default=20)
     ap.add_argument("--until-done", action="store_true")
     ap.add_argument("--citekey", help="只处理单篇, 强制重跑(忽略 state)")
+    ap.add_argument("--citekeys-file", help="文本文件, 每行一个 citekey, 只处理这些")
+    ap.add_argument("--force", action="store_true",
+                     help="连已处理过的也重跑(2026-07-19: extracted-text/ 已改全文重抽, 用这个"
+                          "选项可以用全文重新提取性能数据; 会先删掉旧行再重新写入, 不会重复)")
     ap.add_argument("--model", default="deepseek-chat")
     args = ap.parse_args()
 
@@ -126,22 +148,35 @@ def main():
     state = load_state()
 
     if args.citekey:
+        remove_rows_for({args.citekey})
         _run_batch(client, args, state, [args.citekey])
         return
 
+    allowed = None
+    if args.citekeys_file:
+        allowed = {ln.strip() for ln in Path(args.citekeys_file).read_text(encoding="utf-8").splitlines() if ln.strip()}
+
     while True:
         all_citekeys = sorted(p.stem for p in EXTRACTED_TEXT.glob("*.txt"))
-        todo = [k for k in all_citekeys if k not in state][: args.limit]
+        if allowed is not None:
+            all_citekeys = [k for k in all_citekeys if k in allowed]
+        if args.force:
+            todo = [k for k in all_citekeys if state.get(k, {}).get("status") != "reprocessed"][: args.limit]
+        else:
+            todo = [k for k in all_citekeys if k not in state][: args.limit]
         if not todo:
-            print("没有待处理的新论文(全部已在 .performance_state.json 记录里)。")
+            print("没有待处理的论文(全部已处理完, 或全部已在 .performance_state.json 记录里)。")
             return
-        print(f"库里共 {len(all_citekeys)} 篇已抽文字缓存, 已处理 {len(state)} 篇, 本批处理 {len(todo)} 篇。")
-        _run_batch(client, args, state, todo)
+        if args.force:
+            remove_rows_for(set(todo))
+        print(f"库里共 {len(all_citekeys)} 篇已抽文字缓存, 已处理 {len(state)} 篇, 本批处理 {len(todo)} 篇"
+              f"{'(--force 重跑)' if args.force else ''}。")
+        _run_batch(client, args, state, todo, mark_status="reprocessed" if args.force else None)
         if not args.until_done:
             return
 
 
-def _run_batch(client, args, state, todo):
+def _run_batch(client, args, state, todo, mark_status: str | None = None):
     total_rows = 0
     for citekey in todo:
         txt_path = EXTRACTED_TEXT / f"{citekey}.txt"
@@ -162,7 +197,7 @@ def _run_batch(client, args, state, todo):
             row["row_id"] = f"{citekey}#{i}"
         append_rows(rows)
         total_rows += len(rows)
-        state[citekey] = {"rows": len(rows)}
+        state[citekey] = {"rows": len(rows), "status": mark_status} if mark_status else {"rows": len(rows)}
         print(f"[完成] {citekey}: {len(rows)} 行性能数据")
 
     if not args.citekey:

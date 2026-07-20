@@ -76,10 +76,17 @@ LICENSE
 | `build_keyword_index.sh` | 重建关键词索引 |
 | `batch_ingest.py` | 无人值守批量入库(断点续跑) |
 | `ds.py` | 通用 LLM API 调用(chat / json / pdf-meta) |
+| `ingest_from_meta.py` | 把 `ds.py pdf-meta` 的 JSON 直接组装成六处文件，省去人工重打正文 |
 | `render_readable_notes.py` | `notes/` → `notes-readable/` 全量重新同步 |
+| `regenerate_notes.py` | 用已缓存的全文重新调用 LLM 重写笔记正文，断点续跑 |
 | `match_orphan_si.py` | 跨文件夹配不上的 SI 附件用标题相似度匹配 |
-| `extract_performance.py` | 批量抽取结构化数值数据到 csv |
-| `build_topic_digest.py` | 主题综述第一步：按标签/关键词筛笔记 + 自动查重 |
+| `extract_performance.py` | 批量抽取结构化数值数据到 csv([领域定制]示例) |
+| `build_topic_digest.py` | 主题综述第一步：按标签/关键词筛笔记 + 自动查重，可选起草分类初稿 |
+| `find_citations.py` | 核实一句/一段话能引用库里哪些文献，区分 support/contradict/unclear |
+| `export_for_endnote.py` | 导出指定 citekey 列表为 RIS/BibTeX，供文献管理软件批量导入 |
+| `scan_new_papers.py` | 候选论文 Crossref 核验 + 去重 + 分类，导出待下载 xlsx |
+| `scan_state.py` | 记录每个领域上次扫描到哪天，供"只搜增量"用 |
+| `parse_search_results.py` | 把搜索引擎原始结果交给便宜的 LLM 抽取候选论文列表 |
 | `md_to_docx.py` | Markdown 综述转 docx(python-docx 实现) |
 | `find_duplicate_titles.py` | 全库标题相似度查重(独立于体检也可单跑) |
 | `resolve_duplicate.py` | 合并两个确认重复的 citekey，自动处理五处文件 |
@@ -87,6 +94,8 @@ LICENSE
 | `export_referable_folder.py` | 按条件筛选，导出 PDF+笔记到独立文件夹 |
 
 每个脚本都有 `--help` 和文件头 docstring 说明用法；涉及删除/改名的脚本默认预览模式，加 `--apply` 才真正执行。
+
+零编程基础、想直接照着操作的，看 [QUICKSTART.md](QUICKSTART.md)。
 
 ## License
 
