@@ -21,6 +21,7 @@ import tempfile
 import threading
 import time
 import uuid
+import webbrowser
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import urlparse
@@ -350,7 +351,19 @@ def stop_bg_process(run_id: str):
 
 def render_bg_progress(run_id: str, step_pattern: str = r"\[(\d+)/(\d+)\]") -> bool:
     """展示某个后台任务当前进度(进度条+最新一行状态文字)+"停止"按钮。返回True表示
-    任务已经跑完(done或被停止), 调用方据此决定是否去读输出文件、清理run_id。"""
+    任务已经跑完(done或被停止), 调用方据此决定是否去读输出文件、清理run_id。
+    
+    防重复渲染: Streamlit 会同时执行所有 tab 内的 Python 代码(不只当前可见 tab),
+    如果多个后台任务同时在跑, 各自的 render_bg_progress 会叠加出多个进度条。
+    用 _rendered_this_cycle 集合确保每次 rerun 只渲染一个进度条(第一个调用的)。"""
+    if not hasattr(st.session_state, '_progress_rendered'):
+        st.session_state['_progress_rendered'] = False
+    if st.session_state['_progress_rendered']:
+        # 本轮已经有进度条在渲染了, 跳过这个, 返回 False(不标记完成)
+        state = _BG_RUNS.get(run_id)
+        return state is not None and state.get("done", False)
+    st.session_state['_progress_rendered'] = True
+
     state = _BG_RUNS.get(run_id)
     if not state:
         return True
@@ -560,7 +573,9 @@ def _get_streamlit_url() -> str:
 
 
 def open_citation_network(citekey: str = ""):
-    """生成引用图谱 HTML 并设置内嵌显示标志。每次都带 --focus 重新生成(有缓存时秒级)。"""
+    """打开引用图谱 HTML。每次都带 --focus 重新生成 HTML(有缓存时秒级)。
+    citekey: 从哪个笔记进来的, 直接嵌入 HTML 高亮该节点。
+    """
     html_path = ROOT / "exports" / "citation_network.html"
     cache_path = ROOT / "exports" / "citation_network_cache.json"
     first_time = not cache_path.exists()
@@ -573,8 +588,10 @@ def open_citation_network(citekey: str = ""):
         if code != 0 or not html_path.exists():
             st.error(f"生成失败：{err or out}")
             return
-    st.session_state["show_citation"] = True
-    st.rerun()
+    try:
+        webbrowser.open(html_path.as_uri())
+    except Exception as e:
+        st.error(f"打不开：{e}")
 
 
 def open_pdf(citekey: str):
@@ -827,18 +844,6 @@ def render_reading_pane(all_papers: dict):
                 if st.button("🔗 引用图谱", key="reading_citation", use_container_width=True):
                     open_citation_network(citekey)
 
-            # 内嵌显示引用图谱
-            if st.session_state.get("show_citation"):
-                html_path = ROOT / "exports" / "citation_network.html"
-                if html_path.exists():
-                    if st.button("✖ 关闭图谱", key="close_citation", use_container_width=True):
-                        st.session_state["show_citation"] = False
-                        st.rerun()
-                    html_content = html_path.read_text(encoding="utf-8")
-                    components.html(html_content, height=700, scrolling=True)
-                else:
-                    st.session_state["show_citation"] = False
-
             extra = []
             if meta["类型"]:
                 extra.append(f"**类型**：{meta['类型']}")
@@ -971,6 +976,9 @@ components.html(
     """,
     height=1,
 )
+
+# 每次 rerun 重置进度条渲染标记——防止多个 tab 里的 render_bg_progress 叠加出多个进度条
+st.session_state['_progress_rendered'] = False
 
 # 顶层布局: 有笔记在阅读时, 右侧留一栏当"阅读窗格"(所有标签页共用同一个阅读窗格,
 # 不管从总览的最近新增点进去还是从文献库浏览页点进去, 效果一样)。两栏都是页面正常
