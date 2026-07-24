@@ -1,0 +1,14 @@
+openai>=1.0
+python-docx>=1.1
+pymupdf>=1.24
+openpyxl>=3.1
+streamlit>=1.38
+
+# 语义检索功能(scripts/build_embedding_index.py / semantic_search.py)
+# 首次运行会从 HuggingFace 下载多语言模型(~130MB)
+sentence-transformers>=2.2
+faiss-cpu>=1.7
+
+# 仅 Windows + 需要"在 Word 光标处插入引用"功能(scripts/word_insert_citation.py)时装,
+# 其余平台/功能不需要这个依赖
+pywin32>=306; sys_platform == "win32"

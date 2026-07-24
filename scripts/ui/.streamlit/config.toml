@@ -1,0 +1,11 @@
+[server]
+# 浏览器断开后 60 秒才视为断开（打开引用图谱等外部页面时后台标签可能被节流，太短会误断连）
+disconnectTimeout = 60
+
+[theme]
+base = "light"
+primaryColor = "#6E8CA0"
+backgroundColor = "#F4F1EC"
+secondaryBackgroundColor = "#DCE3E4"
+textColor = "#3B4A54"
+font = "sans serif"

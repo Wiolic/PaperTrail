@@ -1,0 +1,19 @@
+# 示例名单 —— 换成你自己领域认可的"顶刊"清单即可, 这几行本身没有特殊逻辑。
+# "top journals" 的权威定义(2026-07-18 起, 用户约定)。
+# 每行一个期刊名, 必须与 notes/ frontmatter 里 journal: 字段的写法逐字一致(不做模糊匹配)。
+# 改动这份名单会影响所有引用"top journals"的脚本(如 export_referable_folder.py --top-journals)。
+#
+# 范围: Science、Nature 正刊、Nature 大子刊 + Nature Sustainability(2026-07-18 用户确认加入)、
+# Advanced Materials、JACS、Angewandte Chemie。仍不含 Nature Communications/Nature Reviews*/
+# Nature Protocols——如果之后也要把 Nature Communications 算进来, 加一行 "Nature Communications" 即可。
+Science
+Nature
+Nature Materials
+Nature Chemistry
+Nature Energy
+Nature Catalysis
+Nature Nanotechnology
+Nature Sustainability
+Advanced Materials
+Journal of the American Chemical Society
+Angewandte Chemie International Edition

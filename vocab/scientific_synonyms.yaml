@@ -1,0 +1,780 @@
+# 科研同义词库 (Scientific Synonym Dictionary)
+#
+# 用途:
+#   1. 搜索时自动展开: 搜 "Ir degradation" → 同时搜 "Ir dissolution", "Ir leaching" 等
+#   2. 入库时规范 keywords: DeepSeek prompt 引用此表, 同义词统一用 canonical 写法
+#   3. 主题综述/检索时聚合: 确保同一机制的 20 种写法不被遗漏
+#
+# 格式:
+#   canonical: 规范写法(入库 keywords 应统一使用此写法)
+#   synonyms: 同义词/变体写法(搜索时展开, 入库时归一化到 canonical)
+#   related: 相关概念(不是同义词, 但常一起出现, 供交叉检索)
+#   domain: 所属领域标签
+#
+# 维护规则:
+#   - 新增词条前先查是否已有语义重叠的条目, 有则合并, 不要建近义重复条目
+#   - synonyms 里不要放 canonical 已经在用的写法
+#   - related 是"相关"不是"同义", 别把同义词错放进 related
+
+# ============================================================
+# OER 反应机理 (OER Mechanisms)
+# ============================================================
+
+AEM_OER:
+  canonical: adsorbate evolution mechanism
+  synonyms:
+    - AEM
+    - adsorbate evolution mechanism (AEM)
+    - conventional AEM pathway
+    - AEM-OER pathway
+    - AEM mechanism
+  related:
+    - lattice oxygen mechanism
+    - oxide path mechanism
+    - OER intermediate
+    - "*OH"
+    - "*O"
+    - "*OOH"
+  domain: electrocatalysis
+
+LOM:
+  canonical: lattice oxygen mechanism
+  synonyms:
+    - LOM
+    - lattice oxygen mechanism (LOM)
+    - lattice oxygen participation
+    - lattice oxygen redox
+    - lattice oxygen oxidation mechanism
+    - LOER
+    - lattice-oxygen-mediated mechanism
+  related:
+    - adsorbate evolution mechanism
+    - oxygen vacancy
+    - Ir dissolution
+    - covalency
+  domain: electrocatalysis
+
+OPM:
+  canonical: oxide path mechanism
+  synonyms:
+    - OPM
+    - oxide path mechanism (OPM)
+    - oxide-path mechanism
+    - oxide mechanism
+  related:
+    - adsorbate evolution mechanism
+    - lattice oxygen mechanism
+  domain: electrocatalysis
+
+OER:
+  canonical: oxygen evolution reaction
+  synonyms:
+    - OER
+    - acidic OER
+    - alkaline OER
+    - acidic oxygen evolution reaction
+    - water oxidation
+    - oxygen evolution
+    - electrochemical water oxidation
+  related:
+    - HER
+    - ORR
+    - overall water splitting
+    - overpotential
+    - Tafel slope
+  domain: electrocatalysis
+
+# ============================================================
+# 催化剂降解 (Catalyst Degradation)
+# ============================================================
+
+Ir_dissolution:
+  canonical: Ir dissolution
+  synonyms:
+    - iridium dissolution
+    - Ir leaching
+    - Ir loss
+    - iridium leaching
+    - Ir migration
+    - iridium migration
+    - Ir depletion
+    - Ir thinning
+    - electrode thinning
+    - Ir degradation
+    - catalyst dissolution
+    - accelerated Ir dissolution
+  related:
+    - lattice oxygen mechanism
+    - stability number
+    - Pourbaix diagram
+    - PEMWE anode degradation
+    - IrO2 solubility
+  domain: degradation
+
+Ru_dissolution:
+  canonical: Ru dissolution
+  synonyms:
+    - ruthenium dissolution
+    - Ru leaching
+    - Ru loss
+    - RuOx dissolution
+    - Ru degradation
+    - ruthenium loss
+    - Ru corrosion
+  related:
+    - overoxidation
+    - RuO4 formation
+    - stability
+  domain: degradation
+
+catalyst_degradation:
+  canonical: catalyst degradation
+  synonyms:
+    - catalyst deactivation
+    - catalyst decay
+    - catalyst instability
+    - catalyst deterioration
+    - performance degradation
+    - activity decay
+    - catalyst aging
+  related:
+    - dissolution
+    - sintering
+    - Ostwald ripening
+    - agglomeration
+    - detachment
+  domain: degradation
+
+sintering:
+  canonical: sintering
+  synonyms:
+    - nanoparticle sintering
+    - particle agglomeration
+    - Ostwald ripening
+    - particle coarsening
+    - particle growth
+    - nanoparticle coalescence
+  related:
+    - catalyst degradation
+    - thermal stability
+    - single-atom catalyst
+  domain: degradation
+
+# ============================================================
+# 质子/离子传输 (Proton/Ion Transport)
+# ============================================================
+
+proton_transport:
+  canonical: proton transport
+  synonyms:
+    - proton conduction
+    - proton hopping
+    - proton transfer
+    - Grotthuss mechanism
+    - proton conductivity
+    - H+ transport
+    - proton conduction mechanism
+    - vehicular mechanism
+    - structural diffusion
+  related:
+    - ionomer
+    - hydration
+    - water network
+    - Nafion
+    - hydrogen bonding
+  domain: ion_transport
+
+hydroxide_transport:
+  canonical: hydroxide transport
+  synonyms:
+    - OH- transport
+    - hydroxide conduction
+    - hydroxide conductivity
+    - OH- conductivity
+    - hydroxide ion transfer
+    - anion transport
+  related:
+    - AEM
+    - alkaline stability
+    - Grotthuss mechanism
+  domain: ion_transport
+
+ion_conductivity:
+  canonical: ion conductivity
+  synonyms:
+    - ionic conductivity
+    - ion conduction
+    - proton conductivity
+    - hydroxide conductivity
+    - ion transport
+  related:
+    - ionomer
+    - membrane
+    - electrolyte
+  domain: ion_transport
+
+# ============================================================
+# 计算与建模方法 (Computational Methods)
+# ============================================================
+
+DFT:
+  canonical: DFT
+  synonyms:
+    - density functional theory
+    - DFT calculations
+    - DFT calculation
+    - first-principles calculations
+    - first principles
+    - ab initio calculations
+    - density-functional theory
+    - first-principles calculation
+  related:
+    - DFT+U
+    - AIMD
+    - VASP
+    - PBE
+    - Gibbs free energy
+  domain: computation
+
+DFT_U:
+  canonical: DFT+U
+  synonyms:
+    - Hubbard U correction
+    - DFT plus U
+    - GGA+U
+    - PBE+U
+  related:
+    - DFT
+    - strong correlation
+    - transition metal oxide
+  domain: computation
+
+AIMD:
+  canonical: AIMD
+  synonyms:
+    - ab initio molecular dynamics
+    - ab-initio molecular dynamics
+    - Car-Parrinello molecular dynamics
+    - CPMD
+    - Born-Oppenheimer molecular dynamics
+    - BOMD
+  related:
+    - DFT
+    - molecular dynamics
+    - free energy
+  domain: computation
+
+Pourbaix:
+  canonical: Pourbaix diagram
+  synonyms:
+    - potential-pH diagram
+    - E-pH diagram
+    - stability diagram
+    - Pourbaix analysis
+  related:
+    - corrosion
+    - dissolution
+    - thermodynamic stability
+  domain: computation
+
+# ============================================================
+# 器件与应用 (Devices & Applications)
+# ============================================================
+
+PEMWE:
+  canonical: PEMWE
+  synonyms:
+    - PEM water electrolysis
+    - proton exchange membrane water electrolysis
+    - PEM electrolyzer
+    - PEM water electrolyzer
+    - PEM electrolysis
+    - polymer electrolyte membrane water electrolysis
+    - proton exchange membrane electrolyzer
+  related:
+    - MEA
+    - AEMWE
+    - PEMFC
+    - ionomer
+    - catalyst layer
+  domain: device
+
+AEMWE:
+  canonical: AEMWE
+  synonyms:
+    - AEM water electrolysis
+    - anion exchange membrane water electrolysis
+    - anion exchange membrane water electrolyzer
+    - alkaline water electrolysis
+    - alkaline membrane water electrolysis
+  related:
+    - AEMFC
+    - PEMWE
+    - alkaline stability
+  domain: device
+
+PEMFC:
+  canonical: PEMFC
+  synonyms:
+    - proton exchange membrane fuel cell
+    - polymer electrolyte membrane fuel cell
+    - PEM fuel cell
+    - hydrogen fuel cell
+  related:
+    - PEMWE
+    - MEA
+    - ORR
+    - catalyst layer
+  domain: device
+
+AEMFC:
+  canonical: AEMFC
+  synonyms:
+    - anion exchange membrane fuel cell
+    - alkaline fuel cell
+    - AEM fuel cell
+    - HEMFC
+    - hydroxide exchange membrane fuel cell
+  related:
+    - AEMWE
+    - PEMFC
+    - alkaline stability
+  domain: device
+
+MEA:
+  canonical: MEA
+  synonyms:
+    - membrane electrode assembly
+    - catalyst coated membrane
+    - CCM
+    - membrane-electrode-assembly
+  related:
+    - PEMWE
+    - PEMFC
+    - catalyst layer
+    - ionomer
+    - PTL
+  domain: device
+
+water_splitting:
+  canonical: water splitting
+  synonyms:
+    - overall water splitting
+    - electrochemical water splitting
+    - water electrolysis
+    - electrocatalytic water splitting
+  related:
+    - OER
+    - HER
+    - PEMWE
+    - AEMWE
+  domain: device
+
+# ============================================================
+# 膜与高分子 (Membranes & Polymers)
+# ============================================================
+
+AEM:
+  canonical: anion exchange membrane
+  synonyms:
+    - AEM
+    - anion-exchange membrane
+    - alkaline membrane
+    - hydroxide exchange membrane
+    - HEM
+    - anion exchange polymer
+  related:
+    - AEMWE
+    - AEMFC
+    - alkaline stability
+    - quaternary ammonium
+  domain: membrane
+
+PEM:
+  canonical: proton exchange membrane
+  synonyms:
+    - PEM
+    - proton-exchange membrane
+    - polymer electrolyte membrane
+    - polymer electrolyte
+    - Nafion membrane
+    - PFSA membrane
+  related:
+    - PEMWE
+    - PEMFC
+    - Nafion
+    - ionomer
+    - proton transport
+  domain: membrane
+
+Nafion:
+  canonical: Nafion
+  synonyms:
+    - Nafion membrane
+    - Nafion ionomer
+    - PFSA ionomer
+    - perfluorosulfonic acid
+    - Nafion thin film
+  related:
+    - PEM
+    - ionomer
+    - proton transport
+    - phase separation
+  domain: membrane
+
+ionomer:
+  canonical: ionomer
+  synonyms:
+    - ionomer thin film
+    - ionomer binder
+    - polymeric ion conductor
+    - ion-conducting polymer
+  related:
+    - Nafion
+    - catalyst layer
+    - PEM
+    - AEM
+  domain: membrane
+
+alkaline_stability:
+  canonical: alkaline stability
+  synonyms:
+    - alkaline durability
+    - chemical stability in alkaline
+    - base stability
+    - alkaline degradation resistance
+    - OH- stability
+  related:
+    - AEM
+    - AEMFC
+    - quaternary ammonium
+    - Hofmann elimination
+    - nucleophilic substitution
+  domain: membrane
+
+# ============================================================
+# 稳定性与性能指标 (Stability & Performance Metrics)
+# ============================================================
+
+stability:
+  canonical: stability
+  synonyms:
+    - durability
+    - long-term stability
+    - long-term durability
+    - operational stability
+    - electrochemical stability
+    - cycling stability
+    - chronoamperometric stability
+  related:
+    - degradation
+    - dissolution
+    - accelerated stress test
+    - stability number
+  domain: performance
+
+overpotential:
+  canonical: overpotential
+  synonyms:
+    - overpotential at 10 mA/cm2
+    - OER overpotential
+    - eta
+    - "\u03b7"
+    - applied potential
+  related:
+    - Tafel slope
+    - activity
+    - exchange current density
+  domain: performance
+
+mass_activity:
+  canonical: mass activity
+  synonyms:
+    - mass-specific activity
+    - specific mass activity
+    - activity per mass
+    - A/g
+  related:
+    - turnover frequency
+    - specific activity
+    - Ir loading
+  domain: performance
+
+TOF:
+  canonical: turnover frequency
+  synonyms:
+    - TOF
+    - turnover rate
+    - catalytic turnover frequency
+    - site-specific activity
+  related:
+    - mass activity
+    - active site density
+    - specific activity
+  domain: performance
+
+Tafel_slope:
+  canonical: Tafel slope
+  synonyms:
+    - Tafel analysis
+    - mV/dec
+    - Tafel behavior
+  related:
+    - overpotential
+    - reaction mechanism
+    - rate-determining step
+  domain: performance
+
+AST:
+  canonical: accelerated stress test
+  synonyms:
+    - AST
+    - accelerated degradation test
+    - ADT
+    - accelerated lifetime test
+    - stress testing
+    - potential cycling test
+    - start-up/shut-down cycling
+  related:
+    - durability
+    - degradation
+    - stability
+  domain: performance
+
+stability_number:
+  canonical: stability number
+  synonyms:
+    - S-number
+    - stability metric
+    - OER stability number
+    - dissolution-to-OER ratio
+  related:
+    - Ir dissolution
+    - stability
+    - ICP-MS
+  domain: performance
+
+high_current_density:
+  canonical: high current density
+  synonyms:
+    - large current density
+    - industrially relevant current density
+    - high-current-density operation
+    - 1 A/cm2
+    - 2 A/cm2
+    - industrial current density
+  related:
+    - mass transport
+    - PEMWE
+    - AEMWE
+    - bubble management
+  domain: performance
+
+# ============================================================
+# 形貌与结构 (Morphology & Structure)
+# ============================================================
+
+single_atom:
+  canonical: single-atom catalyst
+  synonyms:
+    - single atom catalyst
+    - single-atom
+    - SAC
+    - atomically dispersed catalyst
+    - isolated single atom
+    - single-site catalyst
+    - single-atom site
+  related:
+    - Co3O4 support
+    - Ir single atom
+    - atom trapping
+  domain: morphology
+
+nanosheet:
+  canonical: nanosheet
+  synonyms:
+    - 2D nanosheet
+    - ultrathin nanosheet
+    - nanosheet array
+    - 2D material
+    - two-dimensional nanosheet
+    - nanoflake
+    - nanolayer
+  related:
+    - 2D materials
+    - layered structure
+    - exfoliation
+  domain: morphology
+
+amorphous:
+  canonical: amorphous
+  synonyms:
+    - amorphous phase
+    - non-crystalline
+    - disordered structure
+    - glassy
+    - poorly crystalline
+    - X-ray amorphous
+  related:
+    - crystalline
+    - phase transformation
+    - local structure
+  domain: morphology
+
+oxygen_vacancy:
+  canonical: oxygen vacancy
+  synonyms:
+    - O vacancy
+    - oxygen vacancies
+    - Vo
+    - oxygen defect
+    - anion vacancy
+    - oxygen deficiency
+  related:
+    - defect engineering
+    - lattice oxygen mechanism
+    - reducible oxide
+  domain: morphology
+
+heterostructure:
+  canonical: heterostructure
+  synonyms:
+    - heterostructured
+    - core-shell structure
+    - interface engineering
+    - heterojunction
+    - heterointerface
+  related:
+    - strain
+    - electronic coupling
+    - lattice mismatch
+  domain: morphology
+
+# ============================================================
+# 电化学测试 (Electrochemical Testing)
+# ============================================================
+
+EIS:
+  canonical: EIS
+  synonyms:
+    - electrochemical impedance spectroscopy
+    - impedance spectroscopy
+    - AC impedance
+    - Nyquist plot
+    - impedance analysis
+  related:
+    - charge transfer resistance
+    - solution resistance
+    - equivalent circuit
+  domain: characterization
+
+CV:
+  canonical: CV
+  synonyms:
+    - cyclic voltammetry
+    - cyclic voltammogram
+    - voltammetric analysis
+  related:
+    - LSV
+    - electrochemical surface area
+    - redox peak
+  domain: characterization
+
+# ============================================================
+# 材料体系 (Material Systems)
+# ============================================================
+
+IrOx:
+  canonical: IrOx
+  synonyms:
+    - iridium oxide
+    - Ir oxide
+    - IrO2
+    - hydrated iridium oxide
+    - amorphous IrOx
+    - IrOx·nH2O
+    - iridium oxyhydroxide
+    - IrOOH
+  related:
+    - PEMWE anode
+    - OER catalyst
+    - rutile IrO2
+    - 3R-IrO2
+  domain: material
+
+RuOx:
+  canonical: RuOx
+  synonyms:
+    - ruthenium oxide
+    - Ru oxide
+    - RuO2
+    - ruthenium dioxide
+    - hydrous ruthenium oxide
+  related:
+    - OER catalyst
+    - Ru dissolution
+    - overoxidation
+  domain: material
+
+# ============================================================
+# 其他高频概念 (Other High-Frequency Concepts)
+# ============================================================
+
+catalyst_layer:
+  canonical: catalyst layer
+  synonyms:
+    - CL
+    - electrode layer
+    - catalytic layer
+    - catalyst-coated layer
+  related:
+    - MEA
+    - ionomer
+    - PTL
+    - triple-phase boundary
+  domain: device
+
+mass_transport:
+  canonical: mass transport
+  synonyms:
+    - mass transfer
+    - mass-transport
+    - reactant transport
+    - gas transport
+    - bubble transport
+    - water management
+    - two-phase transport
+  related:
+    - catalyst layer
+    - PTL
+    - high current density
+    - bubble management
+  domain: device
+
+electron_phonon:
+  canonical: electron-phonon coupling
+  synonyms:
+    - electron phonon coupling
+    - electron-phonon interaction
+    - e-ph coupling
+    - electron-phonon scattering
+  related:
+    - thermal conductivity
+    - superconductivity
+    - lattice dynamics
+  domain: physics
+
+thermal_conductivity:
+  canonical: thermal conductivity
+  synonyms:
+    - lattice thermal conductivity
+    - phonon transport
+    - heat conduction
+    - thermal transport
+    - "κ"
+    - kappa
+  related:
+    - Boltzmann transport equation
+    - phonon scattering
+    - electron-phonon coupling
+  domain: physics

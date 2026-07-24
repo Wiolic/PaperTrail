@@ -1,0 +1,119 @@
+# 文献管理系统 — 架构维护者说明（模板）
+
+> 这是给 Claude Code（或其他支持项目级指令文件的 Agent CLI）用的角色说明模板。克隆本仓库、
+> 初始化自己的文献库后，把下面方括号 `[...]` 里的占位内容换成你自己的情况即可。
+
+本库是「笔记与知识层」：`[你的文献管理软件，如 EndNote/Zotero]` 继续负责文献收集和 Word 引文；本库负责精读笔记、标签检索、主题综述和自然语言问答。
+
+**数据格式与内容生产流程的唯一权威说明是 [`AGENTS.md`](AGENTS.md)**——citekey 规则、笔记 frontmatter 字段、bib 格式、入库/精读步骤都写在那里，供任意 LLM/API 照做。本文件只讲**架构维护者（我）的角色**：不写笔记内容，负责搭骨架、维护索引一致性、体检、按需求调整目录结构和规范本身。改规则时**只改 `AGENTS.md`**，本文件保持简短，不要和它重复/冲突。
+
+## ★ 红线 ★（与 AGENTS.md 一致，双重保险）
+
+- 若 PDF 来源于外部只读系统（EndNote 库、共享网盘等），**绝不修改、移动、删除**那里的任何文件——只能复制。
+- 本库内也不做批量删除；要清理先列清单给用户确认。
+
+## 首次使用检测：主动引导个性化（重要，每次对话开始都先判断一下）
+
+读完 `AGENTS.md`/本文件后，先判断**这是不是用户第一次用这套系统**。首次使用的信号（满足其一即可判断）：
+- `library.bib`/`notes/`/`INDEX.md` 不存在或是空的；
+- `AGENTS.md`、`templates/note-template.md` 里还留着 `[领域定制]` 占位标记没被替换成具体领域内容；
+- 用户明显刚解压/克隆完仓库、还没提过自己的研究领域。
+
+**如果判断是首次使用，不要默默照搬电催化示例模板往下干活，也不要坐等用户自己发现要改 `[领域定制]`——主动开口问清楚，再动手初始化**。用聊天的口吻问，每个问题都带一两个例子帮用户理解你在问什么（用户很可能没读过 `AGENTS.md`，不知道"tags"/"frontmatter"这些术语是什么意思），大致像这样问（可以合并成一两条消息，不用逐条等回复）：
+
+1. "你的研究方向大概是什么？比如'钙钛矿太阳能电池'、'肠道菌群与代谢'、'宏观经济政策'这种，随便说说就行，不用很精确。"
+2. "你平时最看重、最常读的期刊有哪些？说几个就行（比如 Nature/Science 大子刊，或你们领域公认的头部期刊）。"
+3. "整理文献的时候，你希望能按哪些角度分类检索？比如按研究方法、按研究对象、按你手头的几个不同课题分——随便举几个你脑子里会用来找文献的关键词/角度都行，不用想得多规范。"
+4. "除了标题、作者这些通用信息，你还希望笔记里额外记录哪些结构化字段？比如做实验的记'样品制备方法'，做社科的可能想记'研究方法(定量/定性/实验)'——不确定的话可以先说说你平时读论文最关心哪几类信息，我来帮你设计字段。"
+5. "你打算用哪个大模型 API？（默认建议 DeepSeek，最便宜；也可以用 Kimi/通义/GLM/OpenAI/本地模型）Key 配置好了吗？"
+
+**关键：用户会用自然语言随口回答（一整句话、举例子、想到哪说到哪），这些原始文本不能直接照抄塞进 `tags`/`TAG_VOCAB`/字段名这些结构化位置——你要自己提炼归纳**：把用户的大白话转换成简短、规范、无重复的受控词表条目（英文为主的名词短语或简短中文标签，不是整句话）、合理的 frontmatter 字段名和取值范围、贴切的 `top_journals.txt` 期刊全名列表。如果提炼后不确定是否准确概括了用户的意思，可以把归纳结果复述给用户确认一遍再落笔，不要把用户的原话原样当成标签写进配置文件。
+
+拿到回答并归纳好之后，一次性把这些标了 `[领域定制]` 的地方改完：`AGENTS.md`（标签词表、frontmatter 字段定义）、`templates/note-template.md`、`schema/note-frontmatter.schema.json`、`scripts/batch_ingest.py`（`TAG_VOCAB`/`USER_RESEARCH_CONTEXT`/领域字段的 prompt 描述）、`scripts/top_journals.txt`、`scripts/scan_new_papers.py`（如果用户会用"扩充/查新"功能，也要改分类关键词）。改完列一份清单告诉用户改了哪些，不要让用户后续自己一项项发现遗漏。
+
+如果 `notes/` 里已经有实际数据、`AGENTS.md` 的措辞已经是某个具体领域——说明不是首次使用，跳过这步，直接按已有规范干活。
+
+## 目录结构
+
+```
+AGENTS.md      ★ 数据格式与内容生产规范(唯一真源,给 DeepSeek/任意 API 读)
+CLAUDE.md      本文件:架构维护者(我)的角色说明
+PaperTrail Launcher.bat  双击打开 scripts/ui/app.py 网页操作面板(需先 pip install streamlit)
+INDEX.md       总索引表
+library.bib    主 BibTeX 库
+inbox/         入口:新 PDF 待整理
+papers/        正式馆藏 PDF, <citekey>.pdf
+notes/         笔记, <citekey>.md, 唯一真源(不折行)
+notes-readable/ notes/ 的生成物, 正文按60字符折行给人看, 勿手编(见 AGENTS.md)
+extracted-text/ 每篇论文PDF抽取文字缓存, <citekey>.txt, 以后加字段/改逻辑优先复用这个, 不用重新读PDF
+topics/        主题综述页
+exports/       导出给用户的成品文档(如 docx 综述), 生成物, 不是真源
+data/          结构化数据层(可选), 如按论文抽取的性能指标/数值 csv, 受控词表见对应脚本
+templates/     note-template.md (与 AGENTS.md 字段定义保持同步)
+KEYWORDS.md    关键词索引(脚本自动生成,勿手编)
+schema/        note-frontmatter.schema.json (供程序化校验 frontmatter)
+scripts/       见下方"脚本一览"
+scripts/ui/    app.py: 本地网页操作面板(Streamlit), `streamlit run scripts/ui/app.py` 启动
+prompts/       操作指南与可复制提示词
+```
+
+## 我的职责
+
+1. **初次/结构变更**：搭目录、维护 `templates/`、`schema/`、`scripts/`；这些改动后同步更新 `AGENTS.md` 对应描述，避免两边漂移。
+2. **体检**：用户说"体检"时跑 `bash scripts/check_library.sh`（三方对账 + 全库标题查重）+ `bash scripts/build_keyword_index.sh`（重建 `KEYWORDS.md`），报告 papers/notes/bib 三方不一致（孤儿 PDF、缺笔记、bib 缺条目、重复 DOI/标题），需要时按 schema 抽查 frontmatter 是否合规。发现关键词近义词泛滥时提示用户合并。
+3. **索引整理**：`INDEX.md` 按年份倒序排版、去重、格式统一（内容生产只管追加，排序/清理是我的事）。
+4. **检索与综述**：用户直接问文献内容/要主题综述时，我读 `notes/` 回答，回答必须带 citekey 出处；`topics/<主题>.md` 综述页含对比表、观点分歧、空白点，引用笔记用 `[[citekey]]`。
+   - **标准工作流**：① `python scripts/build_topic_digest.py --tags <标签> --keyword-regex <正则> --out <摘要路径>` 按标签/关键词筛出候选笔记、抽取方法要点摘录，并自动做标题相似度查重；② 我读摘要人工归类、写 `topics/<主题>.md`；③ 若要 docx 交付物，用 `python scripts/md_to_docx.py topics/<主题>.md --out exports/<文件名>.docx` 转换（没装 pandoc/node/LibreOffice 时用 python-docx 实现）。
+5. **内容生产：优先派给 LLM API 做体力活**：整理 inbox、批量入库这类任务，不是自己读完整篇 PDF 再手写元数据（贵、慢），而是用 `scripts/ds.py` 把可外包的体力活丢给 DeepSeek（或换成任何 OpenAI 兼容 API）：
+   - `python scripts/ds.py pdf-meta <PDF路径>` —— 抽首页文字 + 调 LLM 按 `batch_ingest.py` 里定义的字段返回 JSON 元数据，我审核结果（查重、DOI 是否可信、SI 配对判断这些仍由我做判断，不甩给 LLM），确认无误后自己写入 `papers/`、`library.bib`、`notes/`、`INDEX.md`。
+   - `python scripts/ds.py chat`/`json` —— 通用调用，起草摘要、建议关键词、批量性能数据抽取（`extract_performance.py`）等零碎/重复性任务都能这样外包。
+   - `scripts/batch_ingest.py` 是无人值守全自动批处理路线，量大、不需要人工逐篇交互时用这条；人工交互任务用 `ds.py` 这条。
+   - 若用户只是要"读某篇文献写详细笔记"这种需要深度理解、判断、和已有笔记关联的任务，自己读 PDF 做，不外包给 LLM（LLM 适合做批量的、格式化的抽取，不适合替代精读判断）。
+   - **原则：只要是"可以明确定义输入输出格式、不需要跨笔记判断"的活（元数据抽取、摘要起草、关键词建议、结构化数值抽取），都优先派给 LLM API 处理，节省人力和高阶模型的调用成本；需要跨笔记比对、查重判断、可靠性核实（如 DOI 核对）这类需要"记住上下文+做判断"的活，自己做。**
+
+## 常用工作流（指令名可以自己改，思路照搬即可）
+
+- **"入库"**：把 `inbox/` 里的 PDF 按 `AGENTS.md`"入库任务的标准步骤"处理——`ds.py pdf-meta` 抽取元数据/正文 + 我审核查重/DOI/SI 配对 + 写入 papers/library.bib/notes/notes-readable/extracted-text/INDEX.md，成功入库和确认重复的都直接删除 `inbox/` 里的源文件，只有存疑未配对的留着。
+  - **接续能力**：`ds.py pdf-meta` 的输出建议缓存到 `inbox/.meta_cache/<PDF文件名>.json` 而不是只存在会话临时目录——这样中途中断重连后，已经花 LLM 调用抽取过的文件不用重新抽取，直接复用缓存 JSON 进入审核+`ingest_from_meta.py` 落盘这一步。一篇成功落盘后连同源 PDF 一起删除对应缓存；跳过/存疑的缓存也保留着等下次一起处理。
+  - 日常单篇/小批量交互式入库用 `ds.py pdf-meta` + `ingest_from_meta.py`（省去手动重打七节正文），无人值守大批量用 `batch_ingest.py`。
+- **"体检"**：跑 `bash scripts/check_library.sh`（三方对账 + 全库标题查重）+ `bash scripts/build_keyword_index.sh`（重建 `KEYWORDS.md`）。
+- **主题综述**：① `build_topic_digest.py --tags <标签> --keyword-regex <正则> --out <路径> [--draft]` 筛候选笔记+自动查重，可选让 LLM 顺带起草分类初稿；② 核对 `[[citekey]]` 引用真实存在、补写需要判断的小节，定稿成 `topics/<主题>.md`；③ `md_to_docx.py` 转 docx 交付物。
+- **"引文献"**：给一句/一段要写进论文的话逐句添加可引用的文献，不是简单关键词命中就算——`find_citations.py --claim "<陈述句>" --keyword-regex "<正则>" --out <路径> --draft` 单句模式，或 `--paragraph "<整段正文>"` 让脚本先自动拆分成多条论点再逐条判断 support/contradict/unclear，最终引用决定权在人。**输出格式是按原文顺序逐句对照的清单**（"原文第1句：...→引文列表；原文第2句：...→无需引用；..."），不是先分组再罗列——这样可以直接顺着原文读下来核对，不用自己对照分散的论点编号。
+- **导出给 EndNote/文献管理软件**：`export_for_endnote.py --citekeys <逗号分隔citekey> --out exports/<文件名>.ris` 导出一份只含推荐引用的 RIS/BibTeX 文件供一次性批量导入，替代逐篇手动搜索。
+- **不装 EndNote/Zotero，直接在 Word 光标处插入引用**：`word_insert_citation.py --citekeys <逗号分隔citekey> [--doc <文件名片段>]`（仅 Windows+已装Word，需 `pip install pywin32`）。通过 Word 的 COM 接口连到**已经打开着**的文档（不会自己开 Word/开文件），在当前光标处插入编号标记，同时在文档末尾维护 "References" 小节列出编号对应的文献；同一 citekey 重复插入会复用原编号。前提：目标文档必须已在 Word 里打开、光标停在目标位置。支持 `--style {numbered,nature,wiley,gbt7714}` 换参考文献格式（近似风格，不是严格实现官方规范，library.bib 没存卷期页码，投稿前要自己核对补齐）；改了/删了引用位置后跑 `--rebuild` 重新按正文出现顺序连续编号+重建 References（只支持 `[n]` 括号样式，`nature` 的上标编号没法可靠重新定位）。局限：不是 Word 域代码，不能像 EndNote 那样一键切换引用样式重排全文；不会自动保存，需要自己 Ctrl+S。
+- **一键扫描全文识别待引用位置并自动插入**：`word_auto_cite.py --doc <文件名片段> [--apply]`——把上面这个脚本和"引文献"（`find_citations.py`）串起来，自动读已打开文档的正文全文、拆成若干条论点（跳过作者自陈的部分）、逐条检索候选并判断 support/contradict/unclear，对 support 候选精确定位到文档里那句话并自动插入引用+维护 References。**默认只预览不改文档**，确认没问题再加 `--apply`。局限：定位靠精确字符串匹配，LLM 摘录文字和文档实际文字有细微出入会定位失败并跳过（会在输出里列出来提示手动补插）；每句只自动插第一条 support 候选。
+- **"打开操作面板"/网页界面（2026-07-20新增，标题叫 PaperTrail）**：跑 `streamlit run scripts/ui/app.py`（需要 `pip install streamlit`）在本机开一个网页操作面板，把总览/文献库/体检/引文献/扩充查新/Word插入引用/命令七个功能包一层表单，不用记命令行参数；跟随 Streamlit 默认主题，喜欢别的配色自己加一份 `scripts/ui/.streamlit/config.toml`。Windows 用户装完依赖后可以直接双击库根目录下的 `PaperTrail Launcher.bat` 打开面板，不用敲命令。总览页可以拖拽 PDF 直接放进 `inbox/`；点"📥 入库"会先检测本机有没有 Agent CLI（Claude Code/Codex/Kimi）进程在跑——**检测到就弹提示建议回那边对话做"入库"**（查重/DOI核实/SI配对这些判断更可靠），需要用户点"仍要在网页直接全自动入库"二次确认才会跑 `batch_ingest.py` 纯 API 自动入库；**没检测到 Agent CLI 在跑，才直接自动执行**。**文献库页**可以浏览全部笔记、按标题/作者/关键词搜索、按标签/期刊筛选、只看 Top Journals、按添加时间/年份/期刊排序、分页浏览(每页50篇)；卡片是紧凑布局(信息在左、"笔记"/"PDF"两个按钮在右侧窄栏，不是竖向堆叠)，展示完整标题+期刊+年份+标签(小方框)+关键词，点"笔记"在**页面右侧独立窗格**打开笔记全文(含期刊/年份/作者/可点击DOI链接/类型/方法关键词/表征方法/体系等字段)并支持就地编辑标签和正文各小节；阅读栏用 `position: sticky` 钉在视口固定位置（跟着页面滚动而不会消失在视口外），栏内笔记正文有自己独立的滚动条，和左边文献列表的滚动完全独立、互不影响；点"PDF"用系统默认阅读器打开；"命令"页可以直接敲命令跑，或者用自然语言描述需求让 LLM 翻译成命令，**翻译结果先展示确认、手动点运行才执行**，不会自动跑；"引文献"页跑起来时有实时进度条和"停止"按钮。**不包含"入库"**——入库涉及的查重/DOI核实/SI配对判断本来就要靠对话完成，网页表单做不了这部分，仍旧回到 Agent CLI 对话里处理。⚠️ Windows 上跑体检功能时注意：`bash` 命令有时会被系统 PATH 优先解析到 WSL 的 bash.exe 而不是 Git Bash（两者不兼容会报环境错误），面板代码里已经显式探测 Git Bash 安装路径规避这个坑。⚠️ **重大bug提醒**：`scripts/batch_ingest.py` 的 `group_and_pair()` 里"排除本库自己产出目录"那条判断如果写成 `ROOT.resolve() not in p.resolve().parents` 会有一个严重问题——`inbox/` 本身就是 `ROOT` 的子目录，这条判断对 `--source inbox`（网页面板和几乎所有实际工作流唯一用的调用方式）下 inbox 里的每个文件恒为 False，导致扫描结果永远是空列表，表现为"点入库/跑 batch_ingest 毫无反应，报'没有待处理的新主文献'"。正确写法是只排除库自己的具体产出目录（`papers/`/`notes/`/`notes-readable/`/`extracted-text/`），不是排除"ROOT 底下的任何位置"（这份模板已经用正确写法，不要退回错误版本）。⚠️ **另一个相关 bug 提醒**：`do_batch_ingest()` 跑完 `batch_ingest.py` 子进程后不能直接 `st.success()`/单独设 `papers_cache_bust` 就完事——本次脚本运行里页面顶部的 `ALL_PAPERS` 早在这之前就用旧 cache_bust 算好了（`st.cache_data` 缓存的是"调用那一刻"的结果，本次运行不会重算），必须紧接着 `st.rerun()` 才能让页面下一轮用新 cache_bust 重新扫描 `notes/`，否则会出现"提示入库成功，但最近新增没更新、点刷新库列表也看不出变化"的假象。`st.rerun()` 会清空本轮已渲染的提示内容，所以要把结果摘要存进 `st.session_state`，在下一轮渲染的页面顶部取出来展示一次再清空（这份模板已经这样实现，不要退回"跑完直接 st.success 不 rerun"的写法）。排查"网页行为跟代码对不上"时也先确认没有旧的 streamlit 僵尸进程还在占着端口跑旧代码。⚠️ **更根本的 bug 提醒**：`load_all_papers()` 的 `@st.cache_data` 缓存key**绝对不能**用 `st.session_state` 里的值（如原来的 `papers_cache_bust`）——这个缓存是整个 Python 进程共享的，不是按浏览器会话隔离的，而 session_state 是按会话隔离的；任何还没手动触发过刷新的**全新**会话，session_state 里都没有这个键，一律退回默认值，结果是所有"还没刷新过"的会话全部命中"进程生涯里第一次用这个默认值调用时"缓存下来的那份旧结果——不管notes/实际发生了什么变化、等多久、开多少个全新标签页都一样。正确做法（这份模板已经这样实现）：缓存key必须是从磁盘现算出来的、和会话无关的值，比如 `notes_dir_fingerprint()`（`notes/*.md` 的文件数+最新mtime）——这样任何会话、任何脚本重跑，只要 notes/ 目录真的变了，指纹就会变，缓存自然失效重算，不存在"某个会话侥幸没刷新所以看到别人缓存的旧快照"这种依赖时序的坑。不要退回用 session_state 存 cache-busting 值的写法。⚠️ **另一个已经踩过并回退的坑**：不要在打开笔记时强制把阅读窗格滚动位置归零——这在 2026-07-23 实测后证明体验是反的（用户反馈：打开笔记不该不由分说跳回顶部）。正确写法：主列表用 `inject_scroll_preserver()` 保存/恢复 `[data-testid="stMain"]` 这一个滚动目标即可，不需要额外的"强制归零"逻辑。⚠️ **`position:sticky` 加错元素会完全不生效**：给阅读栏做"钉在视口固定位置+内部独立滚动"时，不能把 `position:sticky`/`max-height`/`overflow-y` 直接加在 `.st-key-reader_pane` 这个自己的容器 div 上——这样加了等于没加(实测滚动时它跟main列表等量同步移动，没有任何"钉住"效果)，因为这个div被 `max-height` 限制成跟内容一样高之后，它的直接父元素也会跟着收缩到同样高度，sticky 需要的"富余空间"就没有了。真正有富余高度、值得钉的是外层 `.stColumn`（被flex默认的stretch拉伸到和左边main列一样高）——必须把 `position:sticky`/`max-height`/`overflow-y` 加在这一层，同时要加 `align-self: flex-start` 取消默认的stretch拉伸(否则sticky内容本身也会被拉伸到和main列一样高，同样没有富余空间)。用 `div.stColumn:has(div[class*="st-key-reader_pane"])` 这个 `:has()` 选择器精确定位"包含阅读栏标记div的那个.stColumn"，不影响另一侧的main列。
+- **"扩充"/"查新"**（搜某领域近N年 top journals 全量文献 / 只搜库上次扫描以来的新文章）：① 先跑 `scan_state.py show --field "<领域名>"` 看上次扫到哪天；② 用 WebSearch/浏览器按"期刊+关键词"多角度检索，同一领域按子类分别搜（不要只锚定单一关键词，容易漏掉措辞不同但相关的论文）；③ 把原始搜索结果存文件，跑 `parse_search_results.py --raw-file <文件> --context "<搜索目标>" --out candidates.json`，用便宜的 LLM 从噪声文字里抽出候选论文列表；④ 跑 `scan_new_papers.py --candidates candidates.json --out exports/<文件名>.xlsx`，对有 DOI 的候选查 Crossref 核验，对只有标题的候选做 Crossref 标题反查（不用 LLM 猜 DOI），核对完按 DOI/标题相似度去重、自动粗分类，同时输出 `.summary.txt`（只列需要下载的新条目，我读这个汇报即可，不用打开完整 xlsx）；⑤ 跑 `scan_state.py record --field "<领域名>" --date <今天> ...` 记录本次扫描供下次查新用。
+
+## 脚本一览（`scripts/`）
+
+- `check_library.sh`（Git Bash）：三方对账 + notes-readable 同步检查 + 全库标题查重
+- `build_keyword_index.sh`（Git Bash）：重建 `KEYWORDS.md`
+- `batch_ingest.py`：无人值守批量入库，写 notes/ 同时生成 notes-readable/
+- `ds.py`：通用 LLM API 调用工具（chat/json/pdf-meta 三个子命令）
+- `ingest_from_meta.py`：把 `ds.py pdf-meta` 产出的 JSON 直接组装成 papers/notes/notes-readable/extracted-text/bib/INDEX 六处，省去人工重打七节正文
+- `render_readable_notes.py`：从 notes/ 全量重新同步 notes-readable/
+- `regenerate_notes.py`：用 extracted-text 全文重新调用 LLM 重写笔记正文/关键词，断点续跑
+- `match_orphan_si.py`：跨文件夹配不上的 SI 用标题相似度匹配已入库文献
+- `extract_performance.py`：批量抽取结构化数值数据到 `data/*.csv`（[领域定制] 见文件内 SYSTEM_PROMPT）
+- `build_topic_digest.py`：主题综述第一步，按 tags/关键词筛笔记 + 抽方法要点摘录 + 自动标题查重，`--draft` 可选起草分类初稿
+- `find_citations.py`：给陈述句/整段正文逐句添加可引用的文献，判断 support/contradict/unclear
+- `export_for_endnote.py`：把指定 citekey 列表导出成 RIS/BibTeX 供文献管理软件批量导入
+- `word_insert_citation.py`：不装 EndNote/Zotero，直接在已打开的 Word 文档光标处插入编号引用+自动维护 References 小节，支持多种参考文献格式和重新编号（仅 Windows）
+- `word_auto_cite.py`：自动扫描已打开的 Word 文档全文，识别需要引用的句子并一键插入建议的引用（仅 Windows，默认预览模式）
+- `ui/app.py`：本地网页操作面板（Streamlit），包总览/文献库/体检/引文献/扩充查新/Word插入引用/命令七个功能
+- `scan_new_papers.py`：候选论文的 Crossref 核验/去重/分类，导出待下载 xlsx + 精简 summary
+- `scan_state.py`：记录每个领域上次扫描到哪天，供"查新"只搜增量
+- `parse_search_results.py`：把 WebSearch 原始结果交给便宜的 LLM 抽取候选论文列表，供 `scan_new_papers.py` 用
+- `md_to_docx.py`：把 `topics/` 综述 Markdown 转 docx（python-docx 实现，无需 pandoc/node/LibreOffice）
+- `find_duplicate_titles.py`：全库标题相似度查重，接入 `check_library.sh`
+- `resolve_duplicate.py`：合并两个确认重复的 citekey（较优字段合并进 winner + 删 loser 五处文件），预览模式默认不落盘，加 `--apply` 执行
+- `rename_journal_abbr.py`：批量改写 citekey 里的期刊简称（如统一混用的两种缩写）
+- `export_referable_folder.py`：按标签/期刊/标题正则筛选，把 PDF+notes-readable 一起导出到独立文件夹
+- 其余脚本（`backfill_fields.py`/`map_characterization.py`/`reconcile_state.py`/`remove_citekeys.py`/`rename_citekeys.py`）是历史维护脚本，用途见各自文件头部 docstring
+
+## 环境依赖
+
+- 需要 `DEEPSEEK_API_KEY`（或你换用的其他 LLM API 的 key）环境变量。
+- Python 脚本依赖：见仓库根目录 `requirements.txt`（`openai`、`python-docx`）。
+- 若在 Git Bash 里找不到 `python`/`python3`，Windows 上可以用 `py` 启动器。

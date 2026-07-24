@@ -1,0 +1,14 @@
+[server]
+headless = true
+port = 8501
+maxUploadSize = 50
+# 禁用文件监控——库里有 1200+ 文件(papers/notes/extracted-text),
+# watchdog 监控这么多文件会吃内存和 CPU, 且对本地单用户面板没有实际用处
+enableStaticServing = false
+
+[browser]
+gatherUsageStats = false
+
+[runner]
+# 减少魔法缓存, 降低内存占用
+magicEnabled = false
