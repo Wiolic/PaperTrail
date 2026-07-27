@@ -1,245 +1,112 @@
-# PaperTrail — 对话驱动的文献精读笔记系统
+# PaperTrail
 
-一套**跟 AI 对话就能用**的个人文献知识库框架：把论文 PDF 变成结构化精读笔记，自动分类打标签，配一个**开箱即用的本地网页操作面板**，也可以直接用大白话指挥 AI 帮你检索、去重体检、写论文时逐句找引文、在 Word 里插引用、系统性发现领域新文献、生成主题综述。
+一个把"读论文、记笔记、找文献、写引用"这几件事交给 AI 做的个人文献知识库框架。
 
-> ## 🚀 只想赶紧用起来？→ 直接看 **[QUICKSTART.md](QUICKSTART.md)**
->
-> 核心流程只有三步：**装 AI 助手 → 下载仓库 → 粘贴开场白**。**不用会写代码，也不用记命令。**
+你不需要维护数据库、不需要写代码、也不需要记住任何命令——把 PDF 丢进一个文件夹，剩下的事情要么在网页面板里点几下，要么直接用一句话告诉 AI 助手就行。
 
----
-
-## ⭐ headline：入库即自动分类
-
-拖一篇 PDF 进 `inbox/`，系统自动帮你判断：
-
-- **文章类型**（计算/实验/综述……）
-- **关键词与标签**（不是死列表——库里新出现的领域词会被记住，下次同类论文自动复用同一个标签，不会各说各话）
-- **表征方法**（SEM/XPS/operando XAS……从正文识别）
-- **与你课题的关联度**（按你自己定义的相关性标准打分）
-
-结果落成一份带完整 YAML frontmatter 的 Markdown 笔记，你不用手填任何一个字段。
+**新手直接看 → [QUICKSTART.md](QUICKSTART.md)**（十分钟，从零到能用，全程有人带着走）。
 
 ---
 
-## 🖥️ 网页操作面板（推荐入口）
+## 这套系统解决什么问题
 
-双击 `PaperTrail Launcher.bat`，或对 AI 说"打开操作面板"：
+文献管理软件（EndNote/Zotero）擅长收集文献和管理 Word 引文格式，但**读完一篇论文之后的知识**——它讲了什么、方法是什么、跟你的课题有什么关系、该在写论文时引用哪一句——这些软件基本不管，全靠你自己记或者手写笔记。
 
-| 标签页 | 功能 |
-|--------|------|
-| **📊 总览** | 库存统计、拖拽 PDF 入库、"最近新增" |
-| **📚 文献库** | 按标题/作者/关键词搜索、标签/期刊筛选 + 阅读窗格 + 就地编辑 + 🧠 语义检索 |
-| **🩺 体检** | 三方对账 + 标题查重 |
-| **📝 引文献** | 贴正文 → 逐处找引文 + 方向判断，**进度条 + 停止按钮** |
-| **🔎 扩充/查新** | OpenAlex / 引用图谱 / WebSearch 三引擎，**进度条 + 停止按钮** |
-| **📄 Word** | 插编号引用 / 自动扫全文 |
-| **⚙️ 命令** | 自然语言→命令，**先确认再执行** |
+PaperTrail 补的就是这一段：PDF 进来之后，AI 帮你读、帮你提炼、帮你打标签归类，存成一份结构化但仍然是纯文本、可以被 `grep`/搜索/version control 的 Markdown 笔记。以后无论是"这篇论文讲了什么"、"这个方向有哪些论文"、还是"我这句话该引用哪几篇"，都直接问 AI，AI 去读你自己的笔记库回答，而不是每次都重新翻 PDF。
 
-面板完全独立运行，不依赖 Agent CLI 在后台开着——总览/文献库/体检只读本地文件即可用；引文献/扩充查新/命令翻译需要配好 API Key。
+两边职责分清楚：EndNote/Zotero 继续管你的文献收集和 Word 参考文献列表；PaperTrail 管精读笔记、语义检索和写作时的引用建议。两者不冲突，可以随时把 PaperTrail 里筛好的文献导出成 RIS/BibTeX 丢回 EndNote。
 
 ---
 
-## 两个 AI 分工（对话模式）
+## 用起来是什么样子
 
-不想用网页面板、想直接对着 AI 说话时：
+**入库一篇论文**：把 PDF 拖进 `inbox/` 文件夹，跟 AI 说"入库"（或者在网页面板里点一下）。AI 会：
+读 PDF → 判断这是计算论文还是实验论文 → 识别用了哪些表征手段 → 提炼关键词并打标签 → 判断和你的课题相关不相关 → 写一份带完整元数据的笔记 → 同步进索引和 BibTeX 库。你不用手填任何一个字段，也不用告诉它该打什么标签——标签词表是从你已有笔记里现算出来的，遇到新材料/新体系会自动学会新词，下次同类论文自动沿用，不会出现同一种东西被打上好几种不一致标签、检索时互相找不到的情况。
 
-- **Agent CLI（总管）** —— Claude Code / Codex CLI / Kimi Code 任一。跟你对话、做判断（查重、DOI 核实、SI 配对这类需要"记住上下文"的活）
-- **大模型 API（工人）** —— DeepSeek（默认）或任何 OpenAI 兼容服务。跑批量体力活（元数据抽取、摘要起草）
+**找文献**：可以用标题/作者/关键词精确搜，也可以直接问一句模糊的科研问题（比如"哪些论文研究了催化剂溶解机理"），系统会用语义相似度去匹配那些用词不一样但讲的是同一件事的论文——这部分完全本地计算，不烧 API 额度。
 
-**不锁定供应商**：改一行 `base_url` 就能换模型。
+**写论文时找引用**：把你写的一段话贴给 AI，它会把这段话拆成一句一句，每句话去笔记库里找能支持这句话的论文，直接给你"这句话可以引用 A 和 B，因为……"这样的结果。装了 Word 的话还能让 AI 直接在光标位置插入编号引用，自动维护文末的参考文献列表。
 
-> 本仓库只含**系统骨架**，不含论文数据。
+**追踪领域新论文**：让 AI 系统性地扫描 OpenAlex（覆盖全部论文，不像普通搜索引擎只给你前几条）找某个方向近几年顶刊的文章，自动跟你库里已有的比对去重，把真正新增的候选论文导出成表格给你看。
 
----
-
-## 功能一览（输入 → 输出）
-
-### 1. 入库：PDF → 结构化精读笔记
-
-**输入**：把 PDF 拖进 `inbox/`（或拖进网页面板），对 AI 说「入库」
-
-**输出**：`notes/<citekey>.md`，YAML 元数据 + 七节正文：
-
-```yaml
----
-citekey: 2025-NatCatal-Tailored-Water-Co3O4-PEMWE
-title: Tailored water–surface interactions on cobalt oxide for stable PEMWE
-authors: Luqi Wang et al.
-year: 2025
-journal: Nature Catalysis
-doi: 10.1038/s41929-025-01476-6
-tags: [Co3O4, OER, PEMWE]
-keywords: [La-doped Co3O4, interfacial water, hydrogen-bond network, ...]
-类型: 计算+实验
-方法关键词: SEM/TEM/HAADF-STEM; in situ SERS/ATR-SEIRAS/XAS; DFT+U
-表征方法: [SEM, TEM, HAADF-STEM, XRD, XPS, in situ SERS, ...]
-体系: La and Ca co-doped Co3O4 spinel catalyst
-status: skimmed
----
-
-## 三句话总结
-本文报道了一种镧和钙共掺杂的Co3O4催化剂，通过调控催化剂表面与水分子的
-相互作用来抑制钴的溶解，从而提高酸性OER稳定性...
-
-## 研究问题与核心结论
-## 方法要点
-## 关键图表与数据
-## 与我课题的关联
-## 质疑与局限
-## 值得追的参考文献
-```
-
-同时自动更新 `papers/`、`library.bib`、`INDEX.md`、`notes-readable/`、`extracted-text/` 五处文件，五处 citekey 保持一致。
-
-**标签词表会自动学习**：第一次遇到新材料/新体系时 LLM 会新造一个标签，这个标签立刻被记入"当前受控词表"，后续同类论文的入库 prompt 里就能看到这个词已经存在、直接复用——不会出现同一种材料被打成好几个不同标签、检索时互相找不到的情况。
+**检查库的健康度**：一句"体检"，AI 会核对 PDF、笔记、索引、BibTeX 四处是否互相对得上，有没有同一篇论文被重复收录，笔记格式是不是符合规范。
 
 ---
 
-### 2. 检索：关键词 / 作者 / 语义模糊问题
+## 网页操作面板
 
-**网页面板文献库页**支持三种搜法混用：
-- 关键词/标题/**作者**搜索框（输入作者姓名也能命中）
-- 标签、期刊、Top Journals、年份筛选
-- 🧠 语义检索：输入模糊科研问题（不需要关键词命中）
+如果你不想每次都打字跟 AI 对话，双击仓库根目录的 `PaperTrail Launcher.bat` 就能打开一个本地网页面板（基于 Streamlit），把上面这些操作都做成了按钮和表单：
 
-```
-py scripts/semantic_search.py "哪些论文研究了 Ir 溶解机理"
-```
-```
-🧠 语义检索 (top-5):
-  1. [0.87] 2025-NatCommun-Accelerated-Ir-Dissolution-Organic-Compounds
-     — 有机物加速Ir溶解的机制研究
-  2. [0.82] 2024-JACS-Operando-Ir-Nanoparticles-OER
-     — operando 追踪Ir纳米颗粒溶解过程
-  ...
-```
+- **总览**——库里现在有多少篇、最近新增了什么，直接把 PDF 拖进页面就能触发入库
+- **文献库**——搜索（标题/作者/关键词一个框搞定）、按标签或期刊筛选、语义检索、点开某篇直接在旁边的窗格里读全文并就地改标签
+- **体检**——一键跑健康检查
+- **引文献**——贴一段正文，实时看着它逐句检索、给出判断，中途想停就停
+- **扩充/查新**——同样带实时进度和停止按钮的系统性检索
+- **Word**——不用离开面板也能触发插入引用
+- **命令**——不确定该敲什么命令时，用大白话描述需求，AI 帮你翻译成命令，你确认了再执行，不会替你偷偷跑
 
-本地 `sentence-transformers` 多语言 embedding 模型，纯本地推理，不调云端 API；`notes/*.md` 改动后增量重新计算受影响的向量。
+面板是完全独立的本地网页应用，浏览/搜索/体检这些只读操作不需要 AI 助手在后台开着；只有涉及调用大模型的功能（入库、语义检索的解释、扩充查新、命令翻译）才需要配好 API Key。
 
 ---
 
-### 3. 引文献：贴正文 → 逐句找引文
+## 设计上的几条原则
 
-**输入**：
-```
-引文献：IrO2 是 PEMWE 阳极最广泛使用的催化剂，但其高成本和稀缺性
-限制了大规模应用。近年来，多种策略被提出以降低 Ir 载量。
-```
+- **笔记本身就是数据库**：`notes/` 目录下的一堆 Markdown 文件是唯一的真实数据，没有任何隐藏的数据库或缓存是"更权威"的。所有检索、索引、语义向量都是从这些文件派生出来的，删掉重新生成也不会丢失任何信息。
+- **纯文本，方便你自己接管**：笔记是 YAML frontmatter + Markdown 正文，可以直接用文本编辑器打开改，可以 `git diff`，可以被任何脚本解析，不依赖这套工具本身。
+- **不锁定任何一家 AI 服务商**：默认配 DeepSeek 是因为便宜，但所有调用都走标准 OpenAI 接口格式，换成别的模型只需要改一个 `base_url`。
+- **该交给机器做的批量体力活，不要求你自己做**：抽取元数据、生成摘要、判断打什么标签，这些"给定输入输出格式很明确"的活交给便宜的模型批量处理；查重、核实 DOI 这种需要"记住上下文、做判断"的活交给你和更贵一点的模型/对话。
 
-**输出**：
+这些原则以及具体的数据格式规范写在 [`AGENTS.md`](AGENTS.md) 里——这是给任何 AI/脚本读的权威文档，不是给人看的说明书。
+
+---
+
+## 目录长什么样
+
 ```
-句1: "IrO2 是 PEMWE 阳极最广泛使用的催化剂..."
-  ✅ 2024-NatCatal-Active-Site-Density-Energetics-Water-Oxidation-Iridium-Oxides
-     — support: 讨论了IrO2作为标准PEMWE阳极催化剂的地位
-句2: "多种策略被提出以降低 Ir 载量..."
-  ✅ 2025-JACS-Ir-Single-Atoms-Oxygen-Coupling
-     — support: 报道了Ir单原子分散策略
+inbox/                 待处理的新 PDF 扔在这里
+papers/                正式归档的 PDF（按 citekey 命名）
+notes/                 ★ 精读笔记，唯一真源
+notes-readable/        notes/ 的自动生成物，专门排过版给人读，不要手改
+extracted-text/        PDF 抽出来的纯文字缓存，省得每次都要重新读 PDF
+embeddings/            语义检索用的向量索引，从 notes/ 派生，删了能重建
+topics/                 主题综述
+exports/                导出的 docx/xlsx 成品
+library.bib            BibTeX 库
+INDEX.md               总索引表
+
+AGENTS.md               ★ 数据格式与内容生产规范（给 AI 读）
+CLAUDE.md                架构维护角色说明（给 Claude Code 这类工具读）
+ARCHITECTURE.md          技术细节（给想改代码的开发者读）
+QUICKSTART.md            新手上手指南
+templates/               笔记模板
+schema/                  frontmatter 的 JSON Schema
+scripts/                 所有工具脚本（见下表）
+scripts/ui/app.py        网页操作面板
+PaperTrail Launcher.bat  双击打开网页面板
 ```
 
 ---
 
-### 4. 查新/扩充：关键词 → 候选论文清单
+## 脚本能做的事
 
-**输入**：对 AI 说「查新 酸性OER Ir催化剂 领域」
+入库相关：`batch_ingest.py`（无人值守批量入库）、`ingest_from_meta.py`（单篇落盘）、`ds.py`（调用大模型的通用工具）、`regenerate_notes.py`（用已缓存的全文重新生成笔记）。
 
-**输出**：
-```
-🔍 OpenAlex 检索中...
-找到 47 篇候选，Crossref 核验后：
-  ✅ 新增 12 篇（库中未收录）
-  ⏭️ 跳过 35 篇（已入库）
-  导出到 exports/酸性OER-Ir-查新-2026-07.xlsx
-```
+检索相关：`semantic_search.py` + `build_embedding_index.py`（语义检索）、`fulltext_search.py`（笔记正文全文搜索）、`expand_search.py`（同义词展开搜索）、`academic_search.py`（OpenAlex/Semantic Scholar 系统性检索）、`scan_new_papers.py` + `scan_state.py`（查新去重）。
 
----
+写作相关：`find_citations.py`（逐句找引用）、`word_insert_citation.py` + `word_auto_cite.py`（Word 插引用，仅 Windows）、`export_for_endnote.py`（导出 RIS/BibTeX）、`build_topic_digest.py` + `md_to_docx.py`（主题综述）。
 
-### 5. 体检：一句话 → 全库健康检查
+维护相关：`check_library.sh` + `validate_notes.py`（体检）、`find_duplicate_titles.py` + `resolve_duplicate.py`（查重/合并）、`backfill_doi.py`（补全缺失的 DOI）、`auto_link_related.py`（自动关联相似论文）、`build_keyword_index.sh`（重建关键词索引）、`export_referable_folder.py`（按条件导出一份 PDF+笔记的子集）。
 
-```
-🩺 体检报告：
-  papers/:   414 篇   notes/:    414 篇   library.bib: 414 条   INDEX.md:  414 行
-  ✅ 三方对账一致   ✅ 未发现重复 citekey   ✅ notes-readable/ 已同步
-  ⚠️ 发现 2 组标题高度相似（可能是重复收录），建议核实
-```
+每个脚本都可以独立在命令行跑，都带 `--help`；涉及批量修改/删除的脚本默认只预览，加 `--apply` 才真的执行。
 
 ---
 
-### 6. Word 插引用（Windows）
+## 成本
 
-对 AI 说「在 Word 插入 2025-NatCatal-Tailored-Water-Co3O4-PEMWE 引用」→ 在光标处插入 `[23]`，文末自动维护 References。
-
----
-
-## 核心设计
-
-- `notes/` 唯一真源：YAML frontmatter + Markdown 七节式正文
-- 五处 citekey 一致性（papers/notes/notes-readable/bib/INDEX）
-- 标签词表从磁盘现算并自动学习新词（非静态列表）
-- API 不锁定（标准 OpenAI 接口）
-- 语义检索纯本地推理，无云端依赖
-
-完整规范见 [`AGENTS.md`](AGENTS.md) 和 [`CLAUDE.md`](CLAUDE.md)；技术细节见 [`ARCHITECTURE.md`](ARCHITECTURE.md)。
-
----
-
-## 目录结构
-
-```
-QUICKSTART.md           ★ 新手开始
-README.md               本文件
-AGENTS.md               数据格式规范（给 AI）
-CLAUDE.md               架构维护者说明
-ARCHITECTURE.md         系统架构（给开发者）
-templates/              笔记模板
-schema/                 frontmatter JSON Schema
-scripts/                全部工具脚本
-scripts/ui/app.py       Streamlit 网页面板
-prompts/                Agent CLI 指南
-requirements.txt        Python 依赖
-LICENSE                 MIT
-```
-
----
-
-## 脚本一览
-
-| 脚本 | 用途 |
-|---|---|
-| `academic_search.py` | OpenAlex + 引用图谱 + 中文翻译 + AND 过滤 |
-| `batch_ingest.py` | 批量入库（断点续跑，标签自动学习） |
-| `ds.py` | LLM API 调用（chat/json/pdf-meta） |
-| `ingest_from_meta.py` | JSON → 六处文件 |
-| `scan_new_papers.py` | Crossref 核验 + 去重 → xlsx |
-| `scan_state.py` | 记录上次扫描日期 |
-| `parse_search_results.py` | 搜索结果 → 候选列表 |
-| `find_citations.py` | 逐处找引文 + 方向判断 |
-| `export_for_endnote.py` | 导出 RIS/BibTeX |
-| `word_insert_citation.py` | Word 插编号引用（Windows） |
-| `word_auto_cite.py` | 自动扫 Word 插引用（Windows） |
-| `build_embedding_index.py` | 语义索引构建（增量） |
-| `semantic_search.py` | 语义检索（FAISS） |
-| `check_library.sh` | 体检：对账 + 查重 |
-| `build_keyword_index.sh` | 重建关键词索引 |
-| `render_readable_notes.py` | notes → notes-readable 同步 |
-| `regenerate_notes.py` | 重写笔记正文（断点续跑） |
-| `match_orphan_si.py` | 孤立 SI 匹配 |
-| `extract_performance.py` | 抽取结构化数值 |
-| `build_topic_digest.py` | 主题综述筛笔记 |
-| `md_to_docx.py` | Markdown → docx |
-| `resolve_duplicate.py` | 合并重复 citekey |
-| `export_referable_folder.py` | 筛选导出 |
-| `ui/app.py` | 网页面板 |
-
-每个脚本有 `--help`；删除/改名默认预览，`--apply` 才执行。
-
----
-
-## 💰 成本
-
-DeepSeek：**400 篇 ≈ 10 元人民币**。OpenAlex/Semantic Scholar 免费。语义检索本地推理，零 API 成本。
+DeepSeek 处理一篇论文的元数据抽取加笔记生成大概几分钱，几百篇论文的量级总共几块到十几块钱。OpenAlex、Semantic Scholar 免费。语义检索是本地模型推理，不花一分钱 API 费用。
 
 ---
 
 ## License
 
-MIT。论文 PDF 受出版商版权约束——**不要放进公开仓库。**
+MIT。**论文 PDF 本身受出版商版权约束，不要把你的 `papers/`、`notes/` 等实际文献数据放进公开仓库**——本仓库分发的只是空的框架代码。
