@@ -43,9 +43,9 @@ data/                结构化数值数据层（performance.csv）
 
 `schema/note-frontmatter.schema.json` 是权威定义。核心字段：citekey, title, authors, authors_full[], year, journal, doi, tags[], keywords[], 类型(enum), 方法关键词, 表征方法[], 体系, status, rating, related[], si_files[], added。正文固定七节。
 
-### 标签词表是动态的
+### 标签词表是动态的、自动学习的
 
-`load_live_tag_vocab()` 每次调用时扫 `notes/*.md` 的 `tags` 字段现算。**任何重写都要保留"词表从磁盘现算"这个设计**，不要退回静态列表。
+`load_live_tag_vocab()`（`scripts/batch_ingest.py`）每次构建 prompt 时扫一遍 `notes/*.md` 的 `tags` 字段，取"静态种子表 `TAG_VOCAB` ∪ 库里实际出现过的全部标签"作为当前受控词表塞进 prompt。效果：LLM 第一次给某个新材料/新体系新造一个标签后，这个标签立刻对后续所有入库可见——不需要手动把新词写回 `TAG_VOCAB` 常量。**任何重写都要保留"词表从磁盘现算"这个设计**，不要退回静态列表（退回静态列表会导致同一种材料的论文被打上不一致的标签，检索时互相找不到彼此——这是本项目踩过的真实坑）。
 
 ---
 
@@ -138,7 +138,7 @@ data/                结构化数值数据层（performance.csv）
 ### 七个标签页
 
 1. **总览**：库存统计（`notes_dir_fingerprint()` 驱动的缓存扫描）、拖拽 PDF、入库按钮（检测 Agent CLI）、"最近新增"卡片
-2. **文献库**：搜索/筛选/排序/分页 + 右侧阅读窗格（sticky 定位 + 独立滚动）+ 就地编辑 + 语义检索
+2. **文献库**：搜索（标题+**作者**+关键词同一个框）/标签筛选/期刊筛选/排序/分页 + 右侧阅读窗格（sticky 定位 + 独立滚动）+ 就地编辑 + 🧠 语义检索
 3. **体检**：跑 `check_library.sh`
 4. **引文献**：贴正文 → 拆句 → 逐条候选 → LLM 判断，**实时进度条 + 停止按钮**
 5. **扩充/查新**：三引擎（OpenAlex / 引用图谱 / WebSearch），**实时进度条 + 停止按钮**
